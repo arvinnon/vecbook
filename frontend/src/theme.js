@@ -1,0 +1,28 @@
+export const themes = {
+  light: {
+    name: "light",
+    bg: "#F5F7FA",
+    card: "#FFFFFF",
+    text: "#111827",
+    muted: "#6B7280",
+    border: "#E5E7EB",
+    header: "#1A73E8",
+    headerText: "#FFFFFF",
+    primary: "#1A73E8",
+    danger: "#DC2626",
+    overlay: "rgba(0,0,0,0.55)",
+  },
+  dark: {
+    name: "dark",
+    bg: "#0B1220",
+    card: "#111827",
+    text: "#F9FAFB",
+    muted: "#A1A1AA",
+    border: "rgba(255,255,255,0.14)",
+    header: "#0B4A8A",
+    headerText: "#FFFFFF",
+    primary: "#60A5FA",
+    danger: "#F87171",
+    overlay: "rgba(0,0,0,0.70)",
+  },
+};

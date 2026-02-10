@@ -1,0 +1,16 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer rounded square -->
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="#1A73E8"></rect>
+
+  <!-- Book shape -->
+  <path d="M14 14C14 12.8954 14.8954 12 16 12H30C31.1046 12 32 12.8954 32 14V32C32 33.1046 31.1046 34 30 34H16C14.8954 34 14 33.1046 14 32V14Z" fill="white" opacity="0.9"></path>
+
+  <!-- Book spine -->
+  <rect x="18" y="12" width="2" height="22" fill="#1A73E8" opacity="0.9"></rect>
+
+  <!-- Camera lens -->
+  <circle cx="25" cy="23" r="5" fill="#1A73E8"></circle>
+
+  <!-- AI dot -->
+  <circle cx="29.5" cy="18.5" r="2" fill="#22C55E"></circle>
+</svg>
