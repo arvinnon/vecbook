@@ -1,8 +1,10 @@
+import time
 import numpy as np
 import cv2
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 
+from backend.config import MATCH_CONFIRMATIONS, MATCH_THRESHOLD, SESSION_TTL_SECONDS
 from backend.recognizer import recognize_from_frame
 from backend.security import require_api_key
 from database.db import (
@@ -14,6 +16,24 @@ from database.db import (
 )
 
 router = APIRouter()
+
+_MATCH_SESSIONS: dict[str, dict[str, float | int]] = {}
+
+
+def _cleanup_sessions(now: float) -> None:
+    expired = [k for k, v in _MATCH_SESSIONS.items() if now - float(v["updated_at"]) > SESSION_TTL_SECONDS]
+    for k in expired:
+        _MATCH_SESSIONS.pop(k, None)
+
+
+def _update_session(session_id: str, teacher_id: int, now: float) -> int:
+    entry = _MATCH_SESSIONS.get(session_id)
+    if entry and int(entry["teacher_id"]) == teacher_id:
+        entry["count"] = int(entry["count"]) + 1
+        entry["updated_at"] = now
+        return int(entry["count"])
+    _MATCH_SESSIONS[session_id] = {"teacher_id": teacher_id, "count": 1, "updated_at": now}
+    return 1
 
 
 @router.get("/attendance")
@@ -39,7 +59,10 @@ def summary(date: str):
 
 
 @router.post("/attendance/recognize")
-async def recognize_attendance(file: UploadFile = File(...)):
+async def recognize_attendance(
+    file: UploadFile = File(...),
+    x_session_id: str | None = Header(default=None),
+):
     if file.content_type not in ("image/jpeg", "image/png"):
         raise HTTPException(status_code=400, detail="Upload JPG/PNG only.")
 
@@ -50,15 +73,33 @@ async def recognize_attendance(file: UploadFile = File(...)):
     if frame is None:
         raise HTTPException(status_code=400, detail="Invalid image data.")
 
-    teacher_id, conf = recognize_from_frame(frame, threshold=60.0)
+    teacher_id, conf = recognize_from_frame(frame, threshold=MATCH_THRESHOLD)
 
     if teacher_id is None:
+        if x_session_id:
+            _MATCH_SESSIONS.pop(x_session_id, None)
         return {"verified": False, "teacher_id": None, "confidence": conf, "reason": "no_match"}
 
     # Prevent ghost IDs (model predicts an ID not in DB)
     row = get_teacher_by_id(teacher_id)
     if not row:
+        if x_session_id:
+            _MATCH_SESSIONS.pop(x_session_id, None)
         return {"verified": False, "teacher_id": teacher_id, "confidence": conf, "reason": "unknown_face"}
+
+    if x_session_id:
+        now = time.monotonic()
+        _cleanup_sessions(now)
+        count = _update_session(x_session_id, teacher_id, now)
+        if count < MATCH_CONFIRMATIONS:
+            return {
+                "verified": False,
+                "teacher_id": teacher_id,
+                "confidence": conf,
+                "reason": "pending_confirmation",
+                "count": count,
+                "needed": MATCH_CONFIRMATIONS,
+            }
 
     # log DTR (time in/out) for this teacher_id
     result = log_dtr_punch(teacher_id)

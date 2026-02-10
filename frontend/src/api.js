@@ -51,13 +51,16 @@ export async function uploadFaces(teacherId, files) {
   return data;
 }
 
-export async function recognizeFrame(blob) {
+export async function recognizeFrame(blob, sessionId = null) {
   const form = new FormData();
   form.append("file", blob, "frame.jpg");
 
+  const headers = withAuth();
+  if (sessionId) headers["X-Session-Id"] = sessionId;
+
   const r = await fetch(`${BASE}/attendance/recognize`, {
     method: "POST",
-    headers: withAuth(),
+    headers,
     body: form,
   });
 

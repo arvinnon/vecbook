@@ -64,3 +64,8 @@ npm run dev
 :lock: Security (Optional)
 You can protect write endpoints with an API key.
 Set `VECBOOK_API_KEY` on the backend and `VITE_API_KEY` on the frontend.
+
+:wrench: Recognition Tuning (Optional)
+- `VECBOOK_MATCH_THRESHOLD` (default: 60)
+- `VECBOOK_MATCH_CONFIRMATIONS` (default: 2 consecutive matches)
+- `VECBOOK_SESSION_TTL_SECONDS` (default: 10)

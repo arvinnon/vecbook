@@ -21,6 +21,12 @@ export default function AttendanceCam() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const timerRef = useRef(null);
+  const noMatchCountRef = useRef(0);
+  const sessionRef = useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
 
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("Camera off");
@@ -61,6 +67,7 @@ export default function AttendanceCam() {
 
     setRunning(true);
     setStatus("Scanning...");
+    noMatchCountRef.current = 0;
     timerRef.current = setInterval(sendFrameOnce, 1000); 
   }
 
@@ -75,6 +82,7 @@ export default function AttendanceCam() {
     setSuccess(null);
     setStatus("Scanning...");
     setVerifying(false);
+    noMatchCountRef.current = 0;
     setTimeout(() => startRecognitionLoop(), 250);
   };
 
@@ -107,9 +115,10 @@ export default function AttendanceCam() {
       setVerifying(true);
       setStatus("Verifying identity...");
 
-      const res = await recognizeFrame(blob);
+      const res = await recognizeFrame(blob, sessionRef.current);
 
       if (res?.reason === "unknown_face") {
+        noMatchCountRef.current = 0;
         setSuccess({
           type: "unknown",
           title: "Face recognized",
@@ -120,9 +129,38 @@ export default function AttendanceCam() {
         return;
       }
       if (!res?.verified) {
-        setStatus("No match / no face detected");
+        if (res?.reason === "pending_confirmation") {
+          noMatchCountRef.current = 0;
+          const n = res?.count || 1;
+          const need = res?.needed || 2;
+          setStatus(`Hold still... (${n}/${need})`);
+          return;
+        }
+        if (res?.reason === "lunch_break") {
+          noMatchCountRef.current = 0;
+          setStatus("Lunch break (12:00-13:00)");
+          return;
+        }
+        if (res?.reason === "out_of_shift") {
+          noMatchCountRef.current = 0;
+          setStatus("Outside shift hours");
+          return;
+        }
+        noMatchCountRef.current += 1;
+        if (noMatchCountRef.current >= 3) {
+          setSuccess({
+            type: "no_match",
+            title: "No match found",
+            message: "Face not recognized. Please try again or enroll first.",
+          });
+          stopRecognitionLoop();
+          setStatus("No match");
+          return;
+        }
+        setStatus(`No match. Retrying (${noMatchCountRef.current}/3)`);
         return;
       }
+      noMatchCountRef.current = 0;
       const t = await fetchTeacherById(res.teacher_id);
       const fullName = t?.found ? t.full_name : `Teacher ID ${res.teacher_id}`;
       const department = t?.found ? t.department : "-";
@@ -353,6 +391,72 @@ export default function AttendanceCam() {
               }}
             >
               Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {success && success.type === "no_match" && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              width: "min(520px, 92vw)",
+              background: "white",
+              color: "#111827",
+              borderRadius: 22,
+              padding: 22,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ display: "grid", placeItems: "center" }}>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background: "#FEE2E2",
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
+                <div style={{ fontSize: 30, color: "#B91C1C" }}>{"\u00D7"}</div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 22, fontWeight: 900, marginTop: 12 }}>
+              {success.title}
+            </div>
+
+            <div style={{ marginTop: 10, color: "#6B7280", fontWeight: 700 }}>
+              {success.message}
+            </div>
+
+            <button
+              onClick={closeModalAndResume}
+              style={{
+                marginTop: 16,
+                width: "100%",
+                padding: 14,
+                borderRadius: 14,
+                background: "#1A73E8",
+                color: "white",
+                border: "none",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              Try Again
             </button>
           </div>
         </div>
