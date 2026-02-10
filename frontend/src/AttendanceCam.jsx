@@ -146,6 +146,21 @@ export default function AttendanceCam() {
           setStatus("Outside shift hours");
           return;
         }
+        if (res?.reason === "low_confidence") {
+          noMatchCountRef.current += 1;
+          if (noMatchCountRef.current >= 3) {
+            setSuccess({
+              type: "no_match",
+              title: "Low confidence match",
+              message: "Face match is too weak. Please try again or enroll first.",
+            });
+            stopRecognitionLoop();
+            setStatus("Low confidence match");
+            return;
+          }
+          setStatus(`Low confidence. Retrying (${noMatchCountRef.current}/3)`);
+          return;
+        }
         noMatchCountRef.current += 1;
         if (noMatchCountRef.current >= 3) {
           setSuccess({

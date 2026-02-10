@@ -4,7 +4,12 @@ import cv2
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 
-from backend.config import MATCH_CONFIRMATIONS, MATCH_THRESHOLD, SESSION_TTL_SECONDS
+from backend.config import (
+    MATCH_CONFIRMATIONS,
+    MATCH_STRICT_THRESHOLD,
+    MATCH_THRESHOLD,
+    SESSION_TTL_SECONDS,
+)
 from backend.recognizer import recognize_from_frame
 from backend.security import require_api_key
 from database.db import (
@@ -86,6 +91,16 @@ async def recognize_attendance(
         if x_session_id:
             _MATCH_SESSIONS.pop(x_session_id, None)
         return {"verified": False, "teacher_id": teacher_id, "confidence": conf, "reason": "unknown_face"}
+
+    if conf is None or conf > MATCH_STRICT_THRESHOLD:
+        if x_session_id:
+            _MATCH_SESSIONS.pop(x_session_id, None)
+        return {
+            "verified": False,
+            "teacher_id": None,
+            "confidence": conf,
+            "reason": "low_confidence",
+        }
 
     if x_session_id:
         now = time.monotonic()

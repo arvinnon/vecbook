@@ -1,6 +1,12 @@
 from fastapi import APIRouter
 
-from backend.config import DB_PATH, MATCH_CONFIRMATIONS, MATCH_THRESHOLD, SESSION_TTL_SECONDS
+from backend.config import (
+    DB_PATH,
+    MATCH_CONFIRMATIONS,
+    MATCH_STRICT_THRESHOLD,
+    MATCH_THRESHOLD,
+    SESSION_TTL_SECONDS,
+)
 
 router = APIRouter()
 
@@ -19,6 +25,7 @@ def dbpath():
 def recognition_config():
     return {
         "match_threshold": MATCH_THRESHOLD,
+        "match_strict_threshold": MATCH_STRICT_THRESHOLD,
         "match_confirmations": MATCH_CONFIRMATIONS,
         "session_ttl_seconds": SESSION_TTL_SECONDS,
     }

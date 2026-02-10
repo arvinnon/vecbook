@@ -30,5 +30,8 @@ PM_START = _parse_time(os.getenv("VECBOOK_PM_START"), time(13, 0))
 PM_END = _parse_time(os.getenv("VECBOOK_PM_END"), time(17, 0))
 
 MATCH_THRESHOLD = float(os.getenv("VECBOOK_MATCH_THRESHOLD", "60"))
+MATCH_STRICT_THRESHOLD = float(
+    os.getenv("VECBOOK_STRICT_MATCH_THRESHOLD", f"{MATCH_THRESHOLD * 0.85:.2f}")
+)
 MATCH_CONFIRMATIONS = int(os.getenv("VECBOOK_MATCH_CONFIRMATIONS", "2"))
 SESSION_TTL_SECONDS = int(os.getenv("VECBOOK_SESSION_TTL_SECONDS", "10"))
