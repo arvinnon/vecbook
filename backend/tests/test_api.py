@@ -1,0 +1,69 @@
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+import backend.config as config
+import backend.main as main
+import database.db as db
+
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    test_db = tmp_path / "vecbook_test.db"
+
+    # Point DB to a temp file for isolation.
+    monkeypatch.setattr(config, "DB_PATH", test_db)
+    monkeypatch.setattr(db, "DB_PATH", test_db)
+    monkeypatch.setattr(main, "DB_PATH", test_db, raising=False)
+
+    db.create_tables()
+
+    with TestClient(main.app) as c:
+        yield c
+
+
+def test_health(client):
+    res = client.get("/health")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+
+def test_create_and_list_teachers(client):
+    payload = {
+        "full_name": "Test Teacher",
+        "department": "Math",
+        "employee_id": "EMP_TEST_001",
+    }
+
+    res = client.post("/teachers", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["id"] >= 1
+    assert data["full_name"] == payload["full_name"]
+    assert data["department"] == payload["department"]
+    assert data["employee_id"] == payload["employee_id"]
+
+    res = client.get("/teachers")
+    assert res.status_code == 200
+    rows = res.json()
+    assert any(r["id"] == data["id"] for r in rows)
+
+
+def test_teacher_dtr_empty_month(client):
+    payload = {
+        "full_name": "DTR Teacher",
+        "department": "Science",
+        "employee_id": "EMP_TEST_002",
+    }
+    res = client.post("/teachers", json=payload)
+    assert res.status_code == 200
+    teacher_id = res.json()["id"]
+
+    month = "2026-02"
+    res = client.get(f"/teachers/{teacher_id}/dtr", params={"month": month})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["teacher"]["id"] == teacher_id
+    assert body["month"] == month
+    assert body["rows"] == []
