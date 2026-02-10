@@ -78,12 +78,17 @@ async def recognize_attendance(
     if frame is None:
         raise HTTPException(status_code=400, detail="Invalid image data.")
 
-    teacher_id, conf = recognize_from_frame(frame, threshold=MATCH_THRESHOLD)
+    teacher_id, conf, reason = recognize_from_frame(frame, threshold=MATCH_THRESHOLD)
 
     if teacher_id is None:
         if x_session_id:
             _MATCH_SESSIONS.pop(x_session_id, None)
-        return {"verified": False, "teacher_id": None, "confidence": conf, "reason": "no_match"}
+        return {
+            "verified": False,
+            "teacher_id": None,
+            "confidence": conf,
+            "reason": reason or "no_match",
+        }
 
     # Prevent ghost IDs (model predicts an ID not in DB)
     row = get_teacher_by_id(teacher_id)

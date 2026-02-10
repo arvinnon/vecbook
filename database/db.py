@@ -35,6 +35,8 @@ def create_tables():
         am_out TEXT,                     -- HH:MM:SS
         pm_in TEXT,                      -- HH:MM:SS
         pm_out TEXT,                     -- HH:MM:SS
+        event_time TEXT,                 -- HH:MM:SS (out-of-shift/lunch scans)
+        status TEXT,                     -- status override
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
         UNIQUE(teacher_id, date)
@@ -44,9 +46,17 @@ def create_tables():
     # Drop legacy unused table if present.
     cursor.execute("DROP TABLE IF EXISTS face_embeddings;")
 
-    # ✅ Migration for older DB
+    # Migration for older DB
     try:
         cursor.execute("ALTER TABLE dtr_logs ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE dtr_logs ADD COLUMN event_time TEXT;")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE dtr_logs ADD COLUMN status TEXT;")
     except sqlite3.OperationalError:
         pass
 
@@ -132,6 +142,29 @@ def log_dtr_punch(teacher_id: int):
 
     if not is_am_window and not is_pm_window:
         reason = "lunch_break" if AM_END <= now_time < PM_START else "out_of_shift"
+        status_label = "Lunch break" if reason == "lunch_break" else "Outside shift hours"
+
+        cur.execute("""
+            SELECT id FROM dtr_logs
+            WHERE teacher_id=? AND date=?
+        """, (teacher_id, date))
+        row = cur.fetchone()
+        if not row:
+            cur.execute("""
+                INSERT INTO dtr_logs (teacher_id, date, event_time, status)
+                VALUES (?, ?, ?, ?)
+            """, (teacher_id, date, punch_time, status_label))
+        else:
+            cur.execute("""
+                UPDATE dtr_logs
+                SET event_time=?,
+                    status=?,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE teacher_id=? AND date=?
+            """, (punch_time, status_label, teacher_id, date))
+
+        conn.commit()
+        conn.close()
         return {
             "logged": False,
             "reason": reason,
@@ -192,6 +225,7 @@ def log_dtr_punch(teacher_id: int):
     cur.execute(f"""
         UPDATE dtr_logs
         SET {slot}=?,
+            status=NULL,
             updated_at=CURRENT_TIMESTAMP
         WHERE teacher_id=? AND date=?
     """, (punch_time, teacher_id, date))
@@ -237,19 +271,22 @@ def get_attendance_records(date=None):
 
     if date:
         cur.execute("""
-            SELECT d.id, t.full_name, t.department, d.date, d.am_in, d.am_out, d.pm_in, d.pm_out
+            SELECT d.id, t.full_name, t.department, d.date,
+                   d.am_in, d.am_out, d.pm_in, d.pm_out, d.event_time, d.status
             FROM dtr_logs d
             JOIN teachers t ON d.teacher_id = t.id
-            WHERE d.date = ? AND (d.am_in IS NOT NULL OR d.pm_in IS NOT NULL)
-            ORDER BY COALESCE(d.am_in, d.pm_in)
+            WHERE d.date = ?
+              AND (d.am_in IS NOT NULL OR d.pm_in IS NOT NULL OR d.event_time IS NOT NULL OR d.status IS NOT NULL)
+            ORDER BY COALESCE(d.am_in, d.pm_in, d.event_time)
         """, (date,))
     else:
         cur.execute("""
-            SELECT d.id, t.full_name, t.department, d.date, d.am_in, d.am_out, d.pm_in, d.pm_out
+            SELECT d.id, t.full_name, t.department, d.date,
+                   d.am_in, d.am_out, d.pm_in, d.pm_out, d.event_time, d.status
             FROM dtr_logs d
             JOIN teachers t ON d.teacher_id = t.id
-            WHERE d.am_in IS NOT NULL OR d.pm_in IS NOT NULL
-            ORDER BY d.date DESC, COALESCE(d.am_in, d.pm_in) ASC
+            WHERE d.am_in IS NOT NULL OR d.pm_in IS NOT NULL OR d.event_time IS NOT NULL OR d.status IS NOT NULL
+            ORDER BY d.date DESC, COALESCE(d.am_in, d.pm_in, d.event_time) ASC
         """)
 
     rows = cur.fetchall()
@@ -259,11 +296,13 @@ def get_attendance_records(date=None):
     out = []
     cutoff_am = AM_START
     cutoff_pm = PM_START
-    for log_id, full_name, department, dt, am_in, am_out, pm_in, pm_out in rows:
-        time_in = am_in or pm_in
+    for log_id, full_name, department, dt, am_in, am_out, pm_in, pm_out, event_time, status_override in rows:
+        time_in = am_in or pm_in or event_time
         time_out = pm_out or am_out
         try:
-            if am_in:
+            if status_override:
+                st = status_override
+            elif am_in:
                 hh, mm, ss = [int(x) for x in am_in.split(":")]
                 st = "On-Time" if time(hh, mm, ss) <= cutoff_am else "Late"
             elif pm_in:
@@ -272,7 +311,7 @@ def get_attendance_records(date=None):
             else:
                 st = "Recorded"
         except Exception:
-            st = "Recorded"
+            st = status_override or "Recorded"
         out.append((log_id, full_name, department, dt, time_in, time_out, st))
     return out
 
