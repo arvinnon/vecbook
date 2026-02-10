@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { enrollWithFaces } from "./api";
 import TrainingStatus from "./TrainingStatus";
@@ -11,19 +11,129 @@ export default function Enroll() {
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [files, setFiles] = useState([]);
+  const [captures, setCaptures] = useState([]);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [autoCapturing, setAutoCapturing] = useState(false);
+
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const autoRef = useRef(null);
+  const captureCountRef = useRef(0);
 
   const [status, setStatus] = useState({ type: "", msg: "" });
   const [loading, setLoading] = useState(false);
+
+  const CAPTURE_TARGET = 12;
+  const MIN_CAPTURES = 8;
+
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraOn(true);
+    } catch (e) {
+      setStatus({ type: "error", msg: `Camera error: ${e.message}` });
+    }
+  }
+
+  function stopCamera() {
+    stopAutoCapture();
+    const v = videoRef.current;
+    if (v?.srcObject) {
+      v.srcObject.getTracks().forEach((t) => t.stop());
+      v.srcObject = null;
+    }
+    setCameraOn(false);
+  }
+
+  async function captureFrameOnce() {
+    if (captureCountRef.current >= CAPTURE_TARGET) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return;
+
+    const targetW = 640;
+    const targetH = Math.round((h / w) * targetW);
+
+    canvas.width = targetW;
+    canvas.height = targetH;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, targetW, targetH);
+
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.9)
+    );
+    if (!blob) return;
+
+    setCaptures((prev) => [...prev, blob]);
+  }
+
+  async function startAutoCapture() {
+    if (autoCapturing || !cameraOn) return;
+    setAutoCapturing(true);
+    autoRef.current = setInterval(async () => {
+      if (captureCountRef.current >= CAPTURE_TARGET) {
+        stopAutoCapture();
+        return;
+      }
+      await captureFrameOnce();
+    }, 300);
+  }
+
+  function stopAutoCapture() {
+    if (autoRef.current) {
+      clearInterval(autoRef.current);
+      autoRef.current = null;
+    }
+    setAutoCapturing(false);
+  }
+
+  useEffect(() => {
+    captureCountRef.current = captures.length;
+    if (autoCapturing && captures.length >= CAPTURE_TARGET) {
+      stopAutoCapture();
+    }
+  }, [captures, autoCapturing]);
+
+  useEffect(() => {
+    return () => {
+      stopAutoCapture();
+      stopCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onSubmit(e) {
     e.preventDefault();
     setStatus({ type: "", msg: "" });
 
-    if (!files || files.length === 0) {
+    if (!fullName.trim() || !department.trim() || !employeeId.trim()) {
       setStatus({
         type: "error",
-        msg: "Please upload at least 1 face image before enrolling.",
+        msg: "Please fill out Full Name, Department, and Employee ID.",
+      });
+      return;
+    }
+
+    if (!captures || captures.length < MIN_CAPTURES) {
+      setStatus({
+        type: "error",
+        msg: `Please capture at least ${MIN_CAPTURES} face images before enrolling.`,
       });
       return;
     }
@@ -31,6 +141,9 @@ export default function Enroll() {
     setLoading(true);
 
     try {
+      const files = captures.map(
+        (blob, i) => new File([blob], `capture_${i + 1}.jpg`, { type: blob.type || "image/jpeg" })
+      );
       const res = await enrollWithFaces({
         full_name: fullName,
         department,
@@ -46,7 +159,7 @@ export default function Enroll() {
       setFullName("");
       setDepartment("");
       setEmployeeId("");
-      setFiles([]);
+      setCaptures([]);
 
       setTimeout(() => navigate("/teachers"), 700);
     } catch (err) {
@@ -88,7 +201,7 @@ export default function Enroll() {
             }}
             title="Toggle theme"
           >
-            {mode === "light" ? "🌙 Dark" : "☀️ Light"}
+            {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
           </button>
 
           <Link
@@ -172,39 +285,138 @@ export default function Enroll() {
               />
             </label>
 
-           
-            <label>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>
-                Face Images{" "}
-                <span style={{ color: t.danger, fontWeight: 900 }}>*required</span>
-              </div>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>
+              Live Face Capture{" "}
+              <span style={{ color: t.danger, fontWeight: 900 }}>*required</span>
+            </div>
 
-              <input
-                type="file"
-                accept="image/png,image/jpeg"
-                multiple
-                onChange={(e) => setFiles(Array.from(e.target.files || []))}
-                style={{
-                  padding: 10,
-                  borderRadius: 12,
-                  border: `1px solid ${t.border}`,
-                  background: inputBg,
-                  color: t.inputText,
-                  width: "100%",
-                }}
+            <div
+              style={{
+                width: "100%",
+                borderRadius: 16,
+                overflow: "hidden",
+                background: "#111827",
+                position: "relative",
+                border: `1px solid ${t.border}`,
+              }}
+            >
+              <video
+                ref={videoRef}
+                style={{ width: "100%", display: "block" }}
+                playsInline
               />
-
-              <div style={{ marginTop: 8, color: t.muted, fontSize: 13, fontWeight: 600 }}>
-                Recommended: <b style={{ color: t.text }}>10–20</b> clear front-facing
-                images (good lighting).
-                {files.length > 0 && (
-                  <>
-                    <br />
-                    Selected: <b style={{ color: t.text }}>{files.length}</b> file(s)
-                  </>
-                )}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  pointerEvents: "none",
+                }}
+              >
+                <div
+                  style={{
+                    width: "55%",
+                    aspectRatio: "1 / 1",
+                    borderRadius: "50%",
+                    border: "3px solid #60A5FA",
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
+                  }}
+                />
               </div>
-            </label>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={startCamera}
+                disabled={cameraOn}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid #E5E7EB",
+                  background: "white",
+                  fontWeight: 900,
+                  cursor: cameraOn ? "not-allowed" : "pointer",
+                }}
+              >
+                Start Camera
+              </button>
+              <button
+                type="button"
+                onClick={stopCamera}
+                disabled={!cameraOn}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid #E5E7EB",
+                  background: "white",
+                  fontWeight: 900,
+                  cursor: !cameraOn ? "not-allowed" : "pointer",
+                }}
+              >
+                Stop
+              </button>
+              <button
+                type="button"
+                onClick={captureFrameOnce}
+                disabled={!cameraOn || autoCapturing || captures.length >= CAPTURE_TARGET}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: t.primary,
+                  color: t.primaryText,
+                  border: "none",
+                  fontWeight: 900,
+                  cursor: !cameraOn || autoCapturing || captures.length >= CAPTURE_TARGET ? "not-allowed" : "pointer",
+                  opacity: !cameraOn || autoCapturing || captures.length >= CAPTURE_TARGET ? 0.8 : 1,
+                }}
+              >
+                Capture
+              </button>
+              <button
+                type="button"
+                onClick={startAutoCapture}
+                disabled={!cameraOn || autoCapturing}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: t.success,
+                  color: t.successText,
+                  border: "none",
+                  fontWeight: 900,
+                  cursor: !cameraOn || autoCapturing ? "not-allowed" : "pointer",
+                  opacity: !cameraOn || autoCapturing ? 0.8 : 1,
+                }}
+              >
+                Auto Capture ({CAPTURE_TARGET})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCaptures([])}
+                disabled={captures.length === 0}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid #E5E7EB",
+                  background: "white",
+                  fontWeight: 900,
+                  cursor: captures.length === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                Clear
+              </button>
+            </div>
+
+            <div style={{ marginTop: 6, color: t.muted, fontSize: 13, fontWeight: 600 }}>
+              Captured: <b style={{ color: t.text }}>{captures.length}</b> / {CAPTURE_TARGET}
+              {captures.length < MIN_CAPTURES && (
+                <>
+                  {" "}
+                  | Minimum required: <b style={{ color: t.text }}>{MIN_CAPTURES}</b>
+                </>
+              )}
+            </div>
 
             <button
               type="submit"
@@ -245,6 +457,7 @@ export default function Enroll() {
               </div>
             )}
           </form>
+          <canvas ref={canvasRef} style={{ display: "none" }} />
 
         </div>
       </div>

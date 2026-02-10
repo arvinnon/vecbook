@@ -1,19 +1,19 @@
-import os
+from pathlib import Path
+
 import cv2 # type: ignore
 import numpy as np # type: ignore
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "face_recognition", "face_model.yml")
+from backend.config import MODEL_PATH
 
 # Use Haar cascade for face detection (simple + offline)
-CASCADE_PATH = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
-FACE_CASCADE = cv2.CascadeClassifier(CASCADE_PATH)
+CASCADE_PATH = Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"
+FACE_CASCADE = cv2.CascadeClassifier(str(CASCADE_PATH))
 
 def load_lbph():
-    if not os.path.exists(MODEL_PATH):
+    if not MODEL_PATH.exists():
         return None
     recognizer = cv2.face.LBPHFaceRecognizer_create()
-    recognizer.read(MODEL_PATH)
+    recognizer.read(str(MODEL_PATH))
     return recognizer
 
 RECOGNIZER = load_lbph()

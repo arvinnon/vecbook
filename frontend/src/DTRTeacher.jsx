@@ -90,7 +90,7 @@ export default function TeacherDTR() {
             }}
             title="Toggle theme"
           >
-            {mode === "light" ? "🌙 Dark" : "☀️ Light"}
+            {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
           </button>
 
           <Link to="/teachers" style={{ color: "white", fontWeight: 700, textDecoration: "none" }}>
@@ -156,13 +156,13 @@ export default function TeacherDTR() {
                 cursor: "pointer",
               }}
             >
-              🖨 Print
+              {"\u{1F5A8} Print"}
             </button>
           </div>
 
           {teacher && (
             <div style={{ marginTop: 10, color: t.muted, fontWeight: 800 }}>
-              <b style={{ color: t.text }}>{teacher.full_name}</b> • {teacher.department} •{" "}
+              <b style={{ color: t.text }}>{teacher.full_name}</b> | {teacher.department} |{" "}
               <span style={{ opacity: 0.9 }}>ID: {teacher.employee_id}</span>
             </div>
           )}
@@ -174,14 +174,14 @@ export default function TeacherDTR() {
           )}
         </div>
 
-        {/* ✅ PRINT AREA */}
+        {/* PRINT AREA */}
         <div className="print-area">
           {/* print header only */}
           <div className="print-only" style={{ marginBottom: 12 }}>
             <h2 style={{ margin: 0 }}>Daily Time Record</h2>
             {teacher && (
               <div style={{ marginTop: 6 }}>
-                <b>{teacher.full_name}</b> • {teacher.department} • ID: {teacher.employee_id} <br />
+                <b>{teacher.full_name}</b> | {teacher.department} | ID: {teacher.employee_id} <br />
                 Month: {month}
               </div>
             )}

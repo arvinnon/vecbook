@@ -1,10 +1,9 @@
 import cv2
-import os
 import numpy as np
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATASET_DIR = os.path.join(BASE_DIR, "assets", "faces")
-MODEL_PATH = os.path.join(BASE_DIR, "face_recognition", "face_model.yml")
+from backend.config import FACES_DIR, MODEL_PATH
+
+DATASET_DIR = FACES_DIR
 
 CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 FACE_CASCADE = cv2.CascadeClassifier(CASCADE_PATH)
@@ -14,23 +13,23 @@ def train_model():
     faces = []
     labels = []
 
-    if not os.path.exists(DATASET_DIR):
+    if not DATASET_DIR.exists():
         print("❌ No dataset folder found.")
         return False
 
-    for teacher_id in os.listdir(DATASET_DIR):
-        folder = os.path.join(DATASET_DIR, teacher_id)
-        if not os.path.isdir(folder):
+    for teacher_dir in DATASET_DIR.iterdir():
+        if not teacher_dir.is_dir():
             continue
 
         try:
-            label = int(teacher_id)
+            label = int(teacher_dir.name)
         except ValueError:
             continue
 
-        for img_name in os.listdir(folder):
-            img_path = os.path.join(folder, img_name)
-            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        for img_path in teacher_dir.iterdir():
+            if not img_path.is_file():
+                continue
+            img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
             if img is None:
                 continue
 
@@ -52,7 +51,7 @@ def train_model():
         return False
 
     recognizer.train(faces, np.array(labels))
-    recognizer.save(MODEL_PATH)
+    recognizer.save(str(MODEL_PATH))
     print("✅ Face model trained successfully")
     return True
 

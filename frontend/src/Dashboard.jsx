@@ -122,7 +122,7 @@ export default function Dashboard() {
           }}
           title="Toggle theme"
         >
-          {mode === "light" ? "🌙 Dark" : "☀️ Light"}
+          {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
         </button>
       </header>
 
@@ -130,28 +130,28 @@ export default function Dashboard() {
         <div className="grid">
           <CardLink
             to="/enroll"
-            icon="➕"
+            icon={"\u2795"}
             title="Register Teacher"
             desc="Add a new teacher profile"
             t={t}
           />
           <CardLink
             to="/camera"
-            icon="📷"
+            icon={"\u{1F4F7}"}
             title="Start Attendance"
             desc="Webcam recognition"
             t={t}
           />
           <CardLink
             to="/teachers"
-            icon="👩‍🏫"
+            icon={"\u{1F469}\u200D\u{1F3EB}"}
             title="Teacher List"
             desc="View registered teachers"
             t={t}
           />
           <CardLink
             to="/records"
-            icon="📋"
+            icon={"\u{1F4CB}"}
             title="Attendance Records"
             desc="Logs & daily summary"
             t={t}

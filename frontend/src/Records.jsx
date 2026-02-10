@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { fetchAttendance, fetchSummary, resetAttendance } from "./api";
+import { deleteAttendanceLog, fetchAttendance, fetchSummary, resetAttendance } from "./api";
 import ConfirmModal from "./ConfirmModal";
 import { useTheme } from "./ThemeProvider";
 
@@ -12,7 +12,10 @@ export default function Records() {
   const [summary, setSummary] = useState(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [resetLoading, setResetLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [toast, setToast] = useState({ type: "", msg: "" });
 
   async function load() {
@@ -40,6 +43,23 @@ export default function Records() {
       setToast({ type: "error", msg: e.message });
     } finally {
       setResetLoading(false);
+    }
+  }
+
+  async function doDeleteLog() {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    setToast({ type: "", msg: "" });
+    try {
+      await deleteAttendanceLog(deleteTarget);
+      setDeleteConfirmOpen(false);
+      setDeleteTarget(null);
+      await load();
+      setToast({ type: "success", msg: "Log entry deleted." });
+    } catch (e) {
+      setToast({ type: "error", msg: e.message });
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -80,7 +100,7 @@ export default function Records() {
             }}
             title="Toggle theme"
           >
-            {mode === "light" ? "🌙 Dark" : "☀️ Light"}
+            {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
           </button>
 
           <Link to="/home" style={{ color: "white", fontWeight: 700, textDecoration: "none" }}>
@@ -147,7 +167,7 @@ export default function Records() {
               }}
               title="Print attendance report"
             >
-              🖨 Print
+              {"\u{1F5A8} Print"}
             </button>
 
             {/* Reset Button */}
@@ -214,7 +234,7 @@ export default function Records() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Name", "Department", "Date", "Time In", "Status"].map((h) => (
+                  {["Name", "Department", "Date", "Time In", "Time Out", "Status", "Actions"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -237,13 +257,33 @@ export default function Records() {
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.department}</td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.date}</td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.time_in}</td>
+                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.time_out || ""}</td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.status}</td>
+                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                      <button
+                        onClick={() => {
+                          setDeleteTarget(r.id);
+                          setDeleteConfirmOpen(true);
+                        }}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 10,
+                          border: "1px solid #FCA5A5",
+                          background: "transparent",
+                          color: t.dangerText,
+                          fontWeight: 900,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
 
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan="5" style={{ padding: 14, color: t.muted }}>
+                    <td colSpan="7" style={{ padding: 14, color: t.muted }}>
                       No records found.
                     </td>
                   </tr>
@@ -265,6 +305,21 @@ export default function Records() {
         loading={resetLoading}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={doReset}
+      />
+
+      <ConfirmModal
+        open={deleteConfirmOpen}
+        title="Delete this log entry?"
+        message="This will permanently delete the selected log entry."
+        confirmText="Yes, delete"
+        cancelText="Cancel"
+        danger
+        loading={deleteLoading}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={doDeleteLog}
       />
     </div>
   );

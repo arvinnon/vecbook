@@ -10,10 +10,10 @@ export default function Splash() {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    // ✅ start fade near the end
+    // start fade near the end
     const fadeTimer = setTimeout(() => setFadeOut(true), 4550); // start fade at 4.55s
 
-    // ✅ navigate after 5s
+    // navigate after 5s
     const navTimer = setTimeout(() => navigate("/home", { replace: true }), 5000);
 
     return () => {
@@ -99,7 +99,7 @@ export default function Splash() {
         </div>
 
         <div style={{ marginTop: 10, color: t.muted, fontWeight: 700, fontSize: 13 }}>
-          Loading…
+          Loading...
         </div>
       </div>
 

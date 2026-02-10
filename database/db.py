@@ -1,13 +1,11 @@
 import sqlite3
-import os
 from datetime import datetime, time
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "database", "vecbook.db")
+from backend.config import AM_END, AM_START, DB_PATH, PM_END, PM_START
 
 
 def connect_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     # recommended with FK tables
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
@@ -27,15 +25,6 @@ def create_tables():
     )
     """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS face_embeddings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        teacher_id INTEGER,
-        embedding BLOB,
-        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
-    )
-    """)
-
     # ✅ DTR table (per teacher per date)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS dtr_logs (
@@ -51,6 +40,9 @@ def create_tables():
         UNIQUE(teacher_id, date)
     )
     """)
+
+    # Drop legacy unused table if present.
+    cursor.execute("DROP TABLE IF EXISTS face_embeddings;")
 
     # ✅ Migration for older DB
     try:
@@ -133,6 +125,20 @@ def log_dtr_punch(teacher_id: int):
     now = datetime.now()
     date = now.strftime("%Y-%m-%d")
     punch_time = now.strftime("%H:%M:%S")
+    now_time = now.time()
+
+    is_am_window = AM_START <= now_time < AM_END
+    is_pm_window = PM_START <= now_time < PM_END
+
+    if not is_am_window and not is_pm_window:
+        reason = "lunch_break" if AM_END <= now_time < PM_START else "out_of_shift"
+        return {
+            "logged": False,
+            "reason": reason,
+            "date": date,
+            "time": punch_time,
+            "already_complete": False,
+        }
 
     # Ensure row exists
     cur.execute("""
@@ -152,17 +158,14 @@ def log_dtr_punch(teacher_id: int):
     else:
         am_in, am_out, pm_in, pm_out = row
 
-    is_am = now.hour < 12
-
     slot = None
     status = "Recorded"
     already_complete = False
 
-    if is_am:
+    if is_am_window:
         if not am_in:
             slot = "am_in"
-            cutoff = time(8, 0, 0)
-            status = "On-Time" if now.time() <= cutoff else "Late"
+            status = "On-Time" if now_time <= AM_START else "Late"
         elif not am_out:
             slot = "am_out"
         else:
@@ -170,6 +173,7 @@ def log_dtr_punch(teacher_id: int):
     else:
         if not pm_in:
             slot = "pm_in"
+            status = "On-Time" if now_time <= PM_START else "Late"
         elif not pm_out:
             slot = "pm_out"
         else:
@@ -233,19 +237,19 @@ def get_attendance_records(date=None):
 
     if date:
         cur.execute("""
-            SELECT t.full_name, t.department, d.date, d.am_in
+            SELECT d.id, t.full_name, t.department, d.date, d.am_in, d.am_out, d.pm_in, d.pm_out
             FROM dtr_logs d
             JOIN teachers t ON d.teacher_id = t.id
-            WHERE d.date = ? AND d.am_in IS NOT NULL
-            ORDER BY d.am_in
+            WHERE d.date = ? AND (d.am_in IS NOT NULL OR d.pm_in IS NOT NULL)
+            ORDER BY COALESCE(d.am_in, d.pm_in)
         """, (date,))
     else:
         cur.execute("""
-            SELECT t.full_name, t.department, d.date, d.am_in
+            SELECT d.id, t.full_name, t.department, d.date, d.am_in, d.am_out, d.pm_in, d.pm_out
             FROM dtr_logs d
             JOIN teachers t ON d.teacher_id = t.id
-            WHERE d.am_in IS NOT NULL
-            ORDER BY d.date DESC, d.am_in ASC
+            WHERE d.am_in IS NOT NULL OR d.pm_in IS NOT NULL
+            ORDER BY d.date DESC, COALESCE(d.am_in, d.pm_in) ASC
         """)
 
     rows = cur.fetchall()
@@ -253,14 +257,23 @@ def get_attendance_records(date=None):
 
     # attach On-Time/Late based on 8:00 cutoff
     out = []
-    cutoff = time(8, 0, 0)
-    for full_name, department, dt, am_in in rows:
+    cutoff_am = AM_START
+    cutoff_pm = PM_START
+    for log_id, full_name, department, dt, am_in, am_out, pm_in, pm_out in rows:
+        time_in = am_in or pm_in
+        time_out = pm_out or am_out
         try:
-            hh, mm, ss = [int(x) for x in am_in.split(":")]
-            st = "On-Time" if time(hh, mm, ss) <= cutoff else "Late"
+            if am_in:
+                hh, mm, ss = [int(x) for x in am_in.split(":")]
+                st = "On-Time" if time(hh, mm, ss) <= cutoff_am else "Late"
+            elif pm_in:
+                hh, mm, ss = [int(x) for x in pm_in.split(":")]
+                st = "On-Time" if time(hh, mm, ss) <= cutoff_pm else "Late"
+            else:
+                st = "Recorded"
         except Exception:
             st = "Recorded"
-        out.append((full_name, department, dt, am_in, st))
+        out.append((log_id, full_name, department, dt, time_in, time_out, st))
     return out
 
 
@@ -269,25 +282,33 @@ def get_daily_summary(date):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT am_in
+        SELECT am_in, pm_in
         FROM dtr_logs
-        WHERE date = ? AND am_in IS NOT NULL
+        WHERE date = ? AND (am_in IS NOT NULL OR pm_in IS NOT NULL)
     """, (date,))
-    times = [r[0] for r in cur.fetchall()]
+    times = cur.fetchall()
     conn.close()
 
     total = len(times)
-    cutoff = time(8, 0, 0)
+    cutoff_am = AM_START
+    cutoff_pm = PM_START
     on_time = 0
     late = 0
 
-    for am_in in times:
+    for am_in, pm_in in times:
         try:
-            hh, mm, ss = [int(x) for x in am_in.split(":")]
-            if time(hh, mm, ss) <= cutoff:
-                on_time += 1
-            else:
-                late += 1
+            if am_in:
+                hh, mm, ss = [int(x) for x in am_in.split(":")]
+                if time(hh, mm, ss) <= cutoff_am:
+                    on_time += 1
+                else:
+                    late += 1
+            elif pm_in:
+                hh, mm, ss = [int(x) for x in pm_in.split(":")]
+                if time(hh, mm, ss) <= cutoff_pm:
+                    on_time += 1
+                else:
+                    late += 1
         except Exception:
             pass
 
@@ -326,3 +347,16 @@ def clear_all_tables():
 
     conn.commit()
     conn.close()
+
+
+def delete_dtr_log(log_id: int) -> bool:
+    conn = connect_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM dtr_logs WHERE id = ?", (log_id,))
+    if not cur.fetchone():
+        conn.close()
+        return False
+    cur.execute("DELETE FROM dtr_logs WHERE id = ?", (log_id,))
+    conn.commit()
+    conn.close()
+    return True

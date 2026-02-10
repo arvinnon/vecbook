@@ -104,7 +104,7 @@ export default function Teachers() {
             }}
             title="Toggle theme"
           >
-            {mode === "light" ? "🌙 Dark" : "☀️ Light"}
+            {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
           </button>
 
           <Link
@@ -143,7 +143,7 @@ export default function Teachers() {
                 }}
                 aria-hidden="true"
               >
-                🔍
+                {"\u{1F50D}"}
               </span>
 
               <input
@@ -257,7 +257,7 @@ export default function Teachers() {
                     {r.created_at}
                   </td>
 
-                  {/* ✅ NEW: Actions */}
+                  {/* NEW: Actions */}
                   <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       <Link
@@ -273,25 +273,7 @@ export default function Teachers() {
                         }}
                         title="View Daily Time Record"
                       >
-                        🗓 DTR
-                      </Link>
-
-                      {/* Optional: quick link to upload faces if you still use it */}
-                      <Link
-                        to={`/teachers/${r.id}/faces`}
-                        style={{
-                          display: "inline-block",
-                          padding: "8px 12px",
-                          borderRadius: 10,
-                          background: mode === "light" ? "#EEF2FF" : "rgba(96,165,250,0.12)",
-                          color: t.text,
-                          fontWeight: 900,
-                          textDecoration: "none",
-                          border: `1px solid ${t.border}`,
-                        }}
-                        title="Manage face images"
-                      >
-                        📷 Faces
+                        {"\u{1F5D3} DTR"}
                       </Link>
                     </div>
                   </td>

@@ -85,11 +85,11 @@ export default function TrainingStatus({ compact = false }) {
 
   const label =
     state === "running"
-      ? "Training in progress…"
+      ? "Training in progress..."
       : state === "success"
-      ? "Model updated ✅"
+      ? "Model updated \u2705"
       : state === "failed"
-      ? "Training failed ❌"
+      ? "Training failed \u274C"
       : "Training idle";
 
   return (
@@ -109,7 +109,7 @@ export default function TrainingStatus({ compact = false }) {
         {label}
         {!compact && data?.started_at && (
           <span style={{ opacity: 0.85, fontWeight: 800 }}>
-            • Started: {data.started_at}
+            Started: {data.started_at}
           </span>
         )}
       </div>

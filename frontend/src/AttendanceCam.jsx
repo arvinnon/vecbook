@@ -125,7 +125,7 @@ export default function AttendanceCam() {
       }
       const t = await fetchTeacherById(res.teacher_id);
       const fullName = t?.found ? t.full_name : `Teacher ID ${res.teacher_id}`;
-      const department = t?.found ? t.department : "—";
+      const department = t?.found ? t.department : "-";
 
       const timeIn = res.time_in || formatTimeNow();
       const alreadyLogged =
@@ -135,6 +135,10 @@ export default function AttendanceCam() {
           ? res.status || "Logged"
           : alreadyLogged
           ? "Already Logged Today"
+          : res.reason === "lunch_break"
+          ? "Lunch break (12:00-13:00)"
+          : res.reason === "out_of_shift"
+          ? "Outside shift hours"
           : "Verified";
 
       setSuccess({
@@ -204,6 +208,26 @@ export default function AttendanceCam() {
                 playsInline
               />
 
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  pointerEvents: "none",
+                }}
+              >
+                <div
+                  style={{
+                    width: "55%",
+                    aspectRatio: "1 / 1",
+                    borderRadius: "50%",
+                    border: "3px solid #60A5FA",
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
+                  }}
+                />
+              </div>
+
               {verifying && (
                 <div
                   style={{
@@ -226,7 +250,7 @@ export default function AttendanceCam() {
                     }}
                   >
                     Verifying identity...{" "}
-                    <span style={{ color: "#60A5FA" }}>•••</span>
+                    <span style={{ color: "#60A5FA" }}>...</span>
                   </div>
                 </div>
               )}
@@ -368,7 +392,7 @@ export default function AttendanceCam() {
                   placeItems: "center",
                 }}
               >
-                <div style={{ fontSize: 30, color: "#16A34A" }}>✓</div>
+                <div style={{ fontSize: 30, color: "#16A34A" }}>{"\u2713"}</div>
               </div>
             </div>
 
@@ -410,14 +434,14 @@ export default function AttendanceCam() {
                 color: "#4B5563",
               }}
             >
-              <span>🕒</span>
+              <span>{"\u{1F552}"}</span>
               <span style={{ fontWeight: 800 }}>Time In:</span>
               <span>{success.time_in}</span>
             </div>
 
             {typeof success.confidence === "number" && (
               <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 800 }}>
-                Confidence: {success.confidence.toFixed(2)} —{" "}
+                Confidence: {success.confidence.toFixed(2)} -{" "}
                 {confidenceLabel(success.confidence)}
               </div>
             )}

@@ -70,7 +70,7 @@ export default function FaceUpload() {
             boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
           }}
         >
-          {/* ✅ Teacher Info */}
+          {/* Teacher Info */}
           {teacher?.found ? (
             <>
               <div style={{ fontSize: 20, fontWeight: 900 }}>
@@ -92,7 +92,7 @@ export default function FaceUpload() {
           <div style={{ color: "#6B7280", marginBottom: 16 }}>
             Upload clear face images (front-facing, good lighting).
             <br />
-            Recommended: <b>10–20 images</b>.
+            Recommended: <b>10-20 images</b>.
           </div>
 
           <form onSubmit={onUpload} style={{ display: "grid", gap: 12 }}>
