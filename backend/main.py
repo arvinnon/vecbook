@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware 
 from database.db import create_tables
 
+from backend.routers.auth import router as auth_router
 from backend.routers.admin import router as admin_router
 from backend.routers.attendance import router as attendance_router
 from backend.routers.core import router as core_router
@@ -34,6 +35,7 @@ app.add_middleware(
 
 
 app.include_router(core_router)
+app.include_router(auth_router)
 app.include_router(teachers_router)
 app.include_router(attendance_router)
 app.include_router(training_router)

@@ -1,9 +1,57 @@
 const BASE = "http://localhost:8000";
-const API_KEY = import.meta.env.VITE_API_KEY;
+const SESSION_TOKEN_KEY = "vecbook_session_token";
+
+function getStorage() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage;
+}
+
+export function getSessionToken() {
+  const storage = getStorage();
+  if (!storage) return "";
+  return storage.getItem(SESSION_TOKEN_KEY) || "";
+}
+
+export function hasSession() {
+  return Boolean(getSessionToken());
+}
+
+export function clearSession() {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.removeItem(SESSION_TOKEN_KEY);
+}
+
+function setSessionToken(token) {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(SESSION_TOKEN_KEY, token);
+}
 
 function withAuth(headers = {}) {
-  if (!API_KEY) return headers;
-  return { ...headers, "X-API-Key": API_KEY };
+  const token = getSessionToken();
+  if (!token) return headers;
+  return { ...headers, Authorization: `Bearer ${token}` };
+}
+
+export async function createSession({ device_id, device_secret }) {
+  const r = await fetch(`${BASE}/auth/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id, device_secret }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Authentication failed");
+  if (!data.access_token) throw new Error("Invalid auth response");
+  setSessionToken(data.access_token);
+  return data;
+}
+
+export async function fetchSessionMe() {
+  const r = await fetch(`${BASE}/auth/me`, { headers: withAuth() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Unauthorized");
+  return data;
 }
 
 export async function fetchTeachers() {

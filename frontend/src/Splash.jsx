@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "./assets/vecbook-logo.svg";
+import { hasSession } from "./api";
 import { useTheme } from "./ThemeProvider";
 
 export default function Splash() {
@@ -10,11 +11,12 @@ export default function Splash() {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
+    const target = hasSession() ? "/home" : "/login";
     // start fade near the end
     const fadeTimer = setTimeout(() => setFadeOut(true), 4550); // start fade at 4.55s
 
     // navigate after 5s
-    const navTimer = setTimeout(() => navigate("/home", { replace: true }), 5000);
+    const navTimer = setTimeout(() => navigate(target, { replace: true }), 5000);
 
     return () => {
       clearTimeout(fadeTimer);

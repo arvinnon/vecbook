@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from pydantic import BaseModel
 
 from backend.config import FACES_DIR
-from backend.security import require_api_key
+from backend.security import require_session
 from backend.services.training import schedule_training
 from database.db import (
     add_teacher,
@@ -53,7 +53,7 @@ def teacher_detail(teacher_id: int):
 
 
 @router.post("/teachers")
-def create_teacher(payload: TeacherCreate, _auth: None = Depends(require_api_key)):
+def create_teacher(payload: TeacherCreate, _session: dict = Depends(require_session)):
     full_name = payload.full_name.strip()
     department = payload.department.strip()
     employee_id = payload.employee_id.strip()
@@ -78,7 +78,7 @@ def create_teacher(payload: TeacherCreate, _auth: None = Depends(require_api_key
 async def upload_faces(
     teacher_id: int,
     background_tasks: BackgroundTasks,
-    _auth: None = Depends(require_api_key),
+    _session: dict = Depends(require_session),
     files: list[UploadFile] = File(...)
 ):
     if not files or len(files) == 0:
@@ -121,7 +121,7 @@ async def upload_faces(
 @router.post("/enroll")
 async def enroll_teacher_with_faces(
     background_tasks: BackgroundTasks,
-    _auth: None = Depends(require_api_key),
+    _session: dict = Depends(require_session),
     full_name: str = Form(...),
     department: str = Form(...),
     employee_id: str = Form(...),
@@ -202,3 +202,5 @@ def teacher_dtr(teacher_id: int, month: str):
             for (d, am_in, am_out, pm_in, pm_out) in data
         ],
     }
+
+

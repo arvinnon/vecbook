@@ -3,11 +3,11 @@ import shutil
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.config import FACES_DIR, MODEL_PATH
-from backend.security import require_api_key
+from backend.security import require_session
 from backend.services.training import reset_training_status
 from database.db import clear_all_tables, clear_attendance
 
-router = APIRouter(dependencies=[Depends(require_api_key)])
+router = APIRouter(dependencies=[Depends(require_session)])
 
 
 @router.post("/admin/reset/attendance")
@@ -37,3 +37,4 @@ def reset_hard():
     reset_training_status()
 
     return {"ok": True, "message": "Reset complete: teachers + faces + model cleared"}
+

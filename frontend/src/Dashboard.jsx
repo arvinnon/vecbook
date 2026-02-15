@@ -124,6 +124,20 @@ export default function Dashboard() {
         >
           {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
         </button>
+        <Link
+          to="/login"
+          style={{
+            color: "white",
+            fontWeight: 800,
+            textDecoration: "none",
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.25)",
+            background: "rgba(255,255,255,0.12)",
+          }}
+        >
+          Session
+        </Link>
       </header>
 
       <div className="container">

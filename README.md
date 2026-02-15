@@ -61,9 +61,20 @@ cd frontend
 npm install
 npm run dev
 
-:lock: Security (Optional)
-You can protect write endpoints with an API key.
-Set `VECBOOK_API_KEY` on the backend and `VITE_API_KEY` on the frontend.
+:lock: Security (Session Token Flow)
+Write/admin endpoints require a Bearer session token.
+Create a session via `POST /auth/session` using:
+- `device_id` (client identifier)
+- `device_secret` (server-side secret from `VECBOOK_DEVICE_SECRET`)
+
+Recommended backend env vars:
+- `VECBOOK_DEVICE_SECRET` (required in real deployments)
+- `VECBOOK_SIGNING_KEY` (token signing key; defaults to device secret)
+- `VECBOOK_AUTH_TOKEN_TTL_SECONDS` (default: 43200 / 12h)
+
+Frontend note:
+- No API secret is embedded in the client.
+- Use the Session Login screen (`/login`) to authenticate and store the bearer token locally.
 
 :wrench: Recognition Tuning (Optional)
 - `VECBOOK_MATCH_THRESHOLD` (default: 60)

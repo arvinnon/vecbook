@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import time
 from pathlib import Path
 
@@ -8,7 +9,13 @@ ASSETS_DIR = Path(os.getenv("VECBOOK_ASSETS_DIR", BASE_DIR / "assets"))
 FACES_DIR = Path(os.getenv("VECBOOK_FACES_DIR", ASSETS_DIR / "faces"))
 MODEL_PATH = Path(os.getenv("VECBOOK_MODEL_PATH", BASE_DIR / "face_recognition" / "face_model.yml"))
 DB_PATH = Path(os.getenv("VECBOOK_DB_PATH", BASE_DIR / "database" / "vecbook.db"))
-API_KEY = os.getenv("VECBOOK_API_KEY")
+DEVICE_SECRET = os.getenv("VECBOOK_DEVICE_SECRET", "vecbook-device-secret-change-me").strip()
+SIGNING_KEY = (
+    os.getenv("VECBOOK_SIGNING_KEY", "").strip()
+    or DEVICE_SECRET
+    or secrets.token_urlsafe(32)
+)
+AUTH_TOKEN_TTL_SECONDS = int(os.getenv("VECBOOK_AUTH_TOKEN_TTL_SECONDS", "43200"))
 
 
 def _parse_time(value: str | None, fallback: time) -> time:

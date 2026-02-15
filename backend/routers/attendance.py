@@ -11,7 +11,7 @@ from backend.config import (
     SESSION_TTL_SECONDS,
 )
 from backend.recognizer import recognize_from_frame
-from backend.security import require_api_key
+from backend.security import require_session
 from database.db import (
     delete_dtr_log,
     get_attendance_records,
@@ -65,6 +65,7 @@ def summary(date: str):
 
 @router.post("/attendance/recognize")
 async def recognize_attendance(
+    _session: dict = Depends(require_session),
     file: UploadFile = File(...),
     x_session_id: str | None = Header(default=None),
 ):
@@ -133,8 +134,10 @@ async def recognize_attendance(
 
 
 @router.delete("/attendance/{log_id}")
-def delete_attendance(log_id: int, _auth: None = Depends(require_api_key)):
+def delete_attendance(log_id: int, _session: dict = Depends(require_session)):
     ok = delete_dtr_log(log_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Log entry not found.")
     return {"ok": True}
+
+

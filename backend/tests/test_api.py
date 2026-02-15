@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -23,20 +21,43 @@ def client(tmp_path, monkeypatch):
         yield c
 
 
+@pytest.fixture()
+def auth_headers(client):
+    res = client.post(
+        "/auth/session",
+        json={
+            "device_id": "pytest-client",
+            "device_secret": config.DEVICE_SECRET,
+        },
+    )
+    assert res.status_code == 200
+    token = res.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_health(client):
     res = client.get("/health")
     assert res.status_code == 200
     assert res.json() == {"status": "ok"}
 
 
-def test_create_and_list_teachers(client):
+def test_session_rejects_invalid_secret(client):
+    res = client.post(
+        "/auth/session",
+        json={"device_id": "pytest-client", "device_secret": "wrong-secret"},
+    )
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Invalid device secret."
+
+
+def test_create_and_list_teachers(client, auth_headers):
     payload = {
         "full_name": "Test Teacher",
         "department": "Math",
         "employee_id": "EMP_TEST_001",
     }
 
-    res = client.post("/teachers", json=payload)
+    res = client.post("/teachers", json=payload, headers=auth_headers)
     assert res.status_code == 200
     data = res.json()
     assert data["id"] >= 1
@@ -50,13 +71,13 @@ def test_create_and_list_teachers(client):
     assert any(r["id"] == data["id"] for r in rows)
 
 
-def test_teacher_dtr_empty_month(client):
+def test_teacher_dtr_empty_month(client, auth_headers):
     payload = {
         "full_name": "DTR Teacher",
         "department": "Science",
         "employee_id": "EMP_TEST_002",
     }
-    res = client.post("/teachers", json=payload)
+    res = client.post("/teachers", json=payload, headers=auth_headers)
     assert res.status_code == 200
     teacher_id = res.json()["id"]
 
@@ -67,3 +88,14 @@ def test_teacher_dtr_empty_month(client):
     assert body["teacher"]["id"] == teacher_id
     assert body["month"] == month
     assert body["rows"] == []
+
+
+def test_recognize_requires_session_token(client, auth_headers):
+    files = {"file": ("frame.jpg", b"not-an-image", "image/jpeg")}
+
+    res = client.post("/attendance/recognize", files=files)
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Missing bearer token."
+
+    res = client.post("/attendance/recognize", files=files, headers=auth_headers)
+    assert res.status_code == 400

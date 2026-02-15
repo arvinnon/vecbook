@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Splash from "./Splash";
+import SessionLogin from "./SessionLogin";
 import Dashboard from "./Dashboard";
 import Teachers from "./Teachers";
 import Records from "./Records";
@@ -12,6 +13,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Splash />} />
+        <Route path="/login" element={<SessionLogin />} />
         <Route path="/home" element={<Dashboard />} />
         <Route path="/teachers" element={<Teachers />} />
         <Route path="/records" element={<Records />} />
