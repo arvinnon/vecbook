@@ -26,8 +26,8 @@ function CardLink({ to, icon, title, desc, t }) {
         {icon}
       </div>
       <div>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>{title}</div>
-        <div style={{ marginTop: 6, fontSize: 13, color: t.muted, fontWeight: 600 }}>
+        <div style={{ fontWeight: 800, fontSize: 19 }}>{title}</div>
+        <div style={{ marginTop: 8, fontSize: 16, color: t.muted, fontWeight: 600 }}>
           {desc}
         </div>
       </div>
@@ -59,8 +59,8 @@ function CardDisabled({ icon, title, desc, t }) {
         {icon}
       </div>
       <div>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>{title}</div>
-        <div style={{ marginTop: 6, fontSize: 13, color: t.muted, fontWeight: 600 }}>
+        <div style={{ fontWeight: 800, fontSize: 19 }}>{title}</div>
+        <div style={{ marginTop: 8, fontSize: 16, color: t.muted, fontWeight: 600 }}>
           {desc}
         </div>
       </div>
@@ -142,8 +142,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="container">
-        <div className="grid">
+      <div className="container" style={{ maxWidth: 1320 }}>
+        <div className="grid dashboardGrid">
           <CardLink
             to="/enroll"
             icon={"\u2795"}

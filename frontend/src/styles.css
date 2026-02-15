@@ -66,18 +66,25 @@ body { margin: 0; color: var(--text); background: var(--bg); }
 
 .grid {
   display: grid;
-  gap: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.dashboardGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .cardLink {
   text-decoration: none;
   color: var(--text);
-  padding: 18px;
-  min-height: 140px;
+  padding: 24px;
+  min-height: 180px;
   display: flex;
-  gap: 14px;
+  flex-direction: column;
+  gap: 18px;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
@@ -87,14 +94,14 @@ body { margin: 0; color: var(--text); background: var(--bg); }
 }
 
 .iconBubble {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
   background: rgba(26,115,232,0.12);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  font-size: 22px;
+  font-size: 26px;
 }
 
 .muted { color: var(--muted); }
@@ -152,4 +159,10 @@ th {
   .container { padding: 16px; }
   .header { padding: 16px; }
   .headerTitle { font-size: 18px; }
+}
+
+@media (max-width: 900px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
 }
