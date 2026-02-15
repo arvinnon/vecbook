@@ -18,6 +18,24 @@ SIGNING_KEY = (
 AUTH_TOKEN_TTL_SECONDS = int(os.getenv("VECBOOK_AUTH_TOKEN_TTL_SECONDS", "43200"))
 
 
+def _parse_bool(value: str | None, fallback: bool) -> bool:
+    if value is None:
+        return fallback
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return fallback
+
+
+def _parse_csv(value: str | None, fallback: list[str]) -> list[str]:
+    if not value:
+        return fallback
+    parsed = [item.strip() for item in value.split(",") if item.strip()]
+    return parsed or fallback
+
+
 def _parse_time(value: str | None, fallback: time) -> time:
     if not value:
         return fallback
@@ -29,6 +47,22 @@ def _parse_time(value: str | None, fallback: time) -> time:
         return time(hh, mm, ss)
     except Exception:
         return fallback
+
+
+CORS_ALLOW_ORIGINS = _parse_csv(
+    os.getenv("VECBOOK_CORS_ALLOW_ORIGINS"),
+    ["http://localhost:5173", "http://127.0.0.1:5173"],
+)
+CORS_ALLOW_METHODS = _parse_csv(
+    os.getenv("VECBOOK_CORS_ALLOW_METHODS"),
+    ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
+CORS_ALLOW_HEADERS = _parse_csv(
+    os.getenv("VECBOOK_CORS_ALLOW_HEADERS"),
+    ["Authorization", "Content-Type", "Accept"],
+)
+CORS_ALLOW_CREDENTIALS = _parse_bool(os.getenv("VECBOOK_CORS_ALLOW_CREDENTIALS"), True)
+ENABLE_DEBUG_ENDPOINTS = _parse_bool(os.getenv("VECBOOK_ENABLE_DEBUG_ENDPOINTS"), False)
 
 
 AM_START = _parse_time(os.getenv("VECBOOK_AM_START"), time(7, 30))

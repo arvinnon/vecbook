@@ -76,6 +76,15 @@ Frontend note:
 - No API secret is embedded in the client.
 - Use the Session Login screen (`/login`) to authenticate and store the bearer token locally.
 
+:shield: Debug + CORS Hardening
+- `/debug/dbpath` is protected by session auth and disabled by default.
+- Enable it only when needed: `VECBOOK_ENABLE_DEBUG_ENDPOINTS=true`
+- CORS is environment-driven:
+  - `VECBOOK_CORS_ALLOW_ORIGINS` (comma-separated origins)
+  - `VECBOOK_CORS_ALLOW_METHODS` (comma-separated methods)
+  - `VECBOOK_CORS_ALLOW_HEADERS` (comma-separated headers)
+  - `VECBOOK_CORS_ALLOW_CREDENTIALS` (`true`/`false`)
+
 :wrench: Recognition Tuning (Optional)
 - `VECBOOK_MATCH_THRESHOLD` (default: 60)
 - `VECBOOK_STRICT_MATCH_THRESHOLD` (default: 85% of match threshold)

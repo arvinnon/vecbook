@@ -1,6 +1,12 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware 
+from backend.config import (
+    CORS_ALLOW_CREDENTIALS,
+    CORS_ALLOW_HEADERS,
+    CORS_ALLOW_METHODS,
+    CORS_ALLOW_ORIGINS,
+)
 from database.db import create_tables
 
 from backend.routers.auth import router as auth_router
@@ -24,13 +30,10 @@ app = FastAPI(title="Vecbook API", lifespan=lifespan)
 # -----------------------------
 app.add_middleware(
     CORSMiddleware,
-     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
+    allow_methods=CORS_ALLOW_METHODS,
+    allow_headers=CORS_ALLOW_HEADERS,
 )
 
 

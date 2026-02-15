@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.config import (
     BLUR_THRESHOLD,
     BRIGHTNESS_MAX,
     BRIGHTNESS_MIN,
     DB_PATH,
+    ENABLE_DEBUG_ENDPOINTS,
     FACE_CENTER_MAX_OFFSET_RATIO,
     MAX_FACES,
     MIN_FACE_SIZE,
@@ -13,6 +14,7 @@ from backend.config import (
     MATCH_THRESHOLD,
     SESSION_TTL_SECONDS,
 )
+from backend.security import require_session
 
 router = APIRouter()
 
@@ -23,7 +25,9 @@ def health():
 
 
 @router.get("/debug/dbpath")
-def dbpath():
+def dbpath(_session: dict = Depends(require_session)):
+    if not ENABLE_DEBUG_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="Not found.")
     return {"db_path": str(DB_PATH)}
 
 

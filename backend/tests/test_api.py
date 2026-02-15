@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 import backend.config as config
 import backend.main as main
+import backend.routers.core as core
 import database.db as db
 
 
@@ -39,6 +40,23 @@ def test_health(client):
     res = client.get("/health")
     assert res.status_code == 200
     assert res.json() == {"status": "ok"}
+
+
+def test_debug_dbpath_disabled_by_default(client, auth_headers):
+    res = client.get("/debug/dbpath", headers=auth_headers)
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Not found."
+
+
+def test_debug_dbpath_requires_session_when_enabled(client, monkeypatch, auth_headers):
+    monkeypatch.setattr(core, "ENABLE_DEBUG_ENDPOINTS", True)
+
+    res = client.get("/debug/dbpath")
+    assert res.status_code == 401
+
+    res = client.get("/debug/dbpath", headers=auth_headers)
+    assert res.status_code == 200
+    assert "db_path" in res.json()
 
 
 def test_session_rejects_invalid_secret(client):

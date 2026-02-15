@@ -108,36 +108,38 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <button
-          onClick={toggle}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.25)",
-            background: "rgba(255,255,255,0.12)",
-            color: "white",
-            fontWeight: 900,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-          title="Toggle theme"
-        >
-          {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
-        </button>
-        <Link
-          to="/login"
-          style={{
-            color: "white",
-            fontWeight: 800,
-            textDecoration: "none",
-            padding: "8px 10px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.25)",
-            background: "rgba(255,255,255,0.12)",
-          }}
-        >
-          Session
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={toggle}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.25)",
+              background: "rgba(255,255,255,0.12)",
+              color: "white",
+              fontWeight: 900,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+            title="Toggle theme"
+          >
+            {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
+          </button>
+          <Link
+            to="/login"
+            style={{
+              color: "white",
+              fontWeight: 800,
+              textDecoration: "none",
+              padding: "8px 10px",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.25)",
+              background: "rgba(255,255,255,0.12)",
+            }}
+          >
+            Session
+          </Link>
+        </div>
       </header>
 
       <div className="container">
