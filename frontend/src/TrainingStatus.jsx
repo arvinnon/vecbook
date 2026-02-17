@@ -71,6 +71,7 @@ export default function TrainingStatus({ compact = false }) {
 
   const state = data?.state || "idle";
   const message = data?.message || "";
+  const queued = Boolean(data?.queued);
 
   let pill;
   if (state === "running") {
@@ -91,6 +92,7 @@ export default function TrainingStatus({ compact = false }) {
       : state === "failed"
       ? "Training failed \u274C"
       : "Training idle";
+  const labelWithQueue = queued ? `${label} (queued)` : label;
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
@@ -106,7 +108,7 @@ export default function TrainingStatus({ compact = false }) {
               : "#60A5FA"
           )}
         />
-        {label}
+        {labelWithQueue}
         {!compact && data?.started_at && (
           <span style={{ opacity: 0.85, fontWeight: 800 }}>
             Started: {data.started_at}

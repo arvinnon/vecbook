@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.config import (
+    ATTENDANCE_ABSENCE_CUTOFF,
+    ATTENDANCE_AUTO_CLOSE_CUTOFF,
+    ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS,
+    ATTENDANCE_GRACE_MINUTES,
+    AM_END,
+    AM_START,
     BLUR_THRESHOLD,
     BRIGHTNESS_MAX,
     BRIGHTNESS_MIN,
@@ -12,6 +18,8 @@ from backend.config import (
     MATCH_CONFIRMATIONS,
     MATCH_STRICT_THRESHOLD,
     MATCH_THRESHOLD,
+    PM_END,
+    PM_START,
     SESSION_TTL_SECONDS,
 )
 from backend.security import require_session
@@ -44,4 +52,12 @@ def recognition_config():
         "blur_threshold": BLUR_THRESHOLD,
         "brightness_min": BRIGHTNESS_MIN,
         "brightness_max": BRIGHTNESS_MAX,
+        "am_start": AM_START.strftime("%H:%M:%S"),
+        "am_end": AM_END.strftime("%H:%M:%S"),
+        "pm_start": PM_START.strftime("%H:%M:%S"),
+        "pm_end": PM_END.strftime("%H:%M:%S"),
+        "attendance_grace_minutes": ATTENDANCE_GRACE_MINUTES,
+        "attendance_auto_close_cutoff": ATTENDANCE_AUTO_CLOSE_CUTOFF.strftime("%H:%M:%S"),
+        "attendance_absence_cutoff": ATTENDANCE_ABSENCE_CUTOFF.strftime("%H:%M:%S"),
+        "attendance_duplicate_cooldown_seconds": ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS,
     }

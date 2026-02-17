@@ -24,7 +24,7 @@ class TeacherCreate(BaseModel):
 
 
 @router.get("/teachers")
-def teachers():
+def teachers(_session: dict = Depends(require_session)):
     rows = get_all_teachers()
     return [
         {
@@ -39,7 +39,7 @@ def teachers():
 
 
 @router.get("/teachers/{teacher_id}")
-def teacher_detail(teacher_id: int):
+def teacher_detail(teacher_id: int, _session: dict = Depends(require_session)):
     row = get_teacher_by_id(teacher_id)
     if not row:
         return {"found": False}
@@ -106,14 +106,21 @@ async def upload_faces(
     if saved == 0:
         raise HTTPException(status_code=400, detail="No valid images. Upload JPG/PNG only.")
 
-    training_started = schedule_training(background_tasks)
+    training_state = schedule_training(background_tasks)
 
     return {
         "teacher_id": teacher_id,
         "saved": saved,
         "folder": str(save_dir),
-        "training_started": training_started,
-        "training_message": "Training started" if training_started else "Training already running",
+        "training_started": training_state == "started",
+        "training_queued": training_state == "queued",
+        "training_message": (
+            "Training started"
+            if training_state == "started"
+            else "Training in progress; next pass queued"
+            if training_state == "queued"
+            else "Training already running"
+        ),
     }
 
 
@@ -134,26 +141,33 @@ async def enroll_teacher_with_faces(
     if not full_name or not department or not employee_id:
         raise HTTPException(status_code=400, detail="All fields are required.")
 
-    # REQUIRE at least 1 image
+    min_enroll_images = 8
     if not files or len(files) == 0:
-        raise HTTPException(status_code=400, detail="At least 1 face image is required.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Please capture at least {min_enroll_images} face images before enrolling.",
+        )
 
-    # Only accept JPG/PNG
     valid_files = [f for f in files if f.content_type in ("image/jpeg", "image/png")]
     if len(valid_files) == 0:
         raise HTTPException(status_code=400, detail="Upload JPG/PNG only.")
 
-    # Insert teacher ONLY IF images exist
+    if len(valid_files) < min_enroll_images:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Please capture at least {min_enroll_images} face images before enrolling.",
+        )
+
+    # Insert teacher only after face-capture requirements pass.
     try:
         new_id = add_teacher(full_name, department, employee_id)
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Employee ID already exists.")
 
-    # Save faces to assets/faces/<id>/
+    # Save faces to assets/faces/<id>/.
+    saved = 0
     save_dir = FACES_DIR / str(new_id)
     save_dir.mkdir(parents=True, exist_ok=True)
-
-    saved = 0
     for idx, f in enumerate(valid_files, start=1):
         ext = ".jpg" if f.content_type == "image/jpeg" else ".png"
         filename = f"img_{idx}{ext}"
@@ -162,7 +176,15 @@ async def enroll_teacher_with_faces(
             shutil.copyfileobj(f.file, out_file)
         saved += 1
 
-    training_started = schedule_training(background_tasks)
+    training_state = schedule_training(background_tasks)
+    training_started = training_state == "started"
+    training_message = (
+        "Training started"
+        if training_state == "started"
+        else "Training in progress; next pass queued"
+        if training_state == "queued"
+        else "Training already running"
+    )
 
     return {
         "id": new_id,
@@ -171,12 +193,13 @@ async def enroll_teacher_with_faces(
         "employee_id": employee_id,
         "saved": saved,
         "training_started": training_started,
-        "training_message": "Training started" if training_started else "Training already running",
+        "training_queued": training_state == "queued",
+        "training_message": training_message,
     }
 
 
 @router.get("/teachers/{teacher_id}/dtr")
-def teacher_dtr(teacher_id: int, month: str):
+def teacher_dtr(teacher_id: int, month: str, _session: dict = Depends(require_session)):
     # month format: YYYY-MM
     row = get_teacher_by_id(teacher_id)
     if not row:

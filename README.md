@@ -21,6 +21,8 @@ Duplicate attendance protection (once per day)
 View daily and all-time logs
 Date filtering
 Summary (Total / On-time / Late)
+Admin scan audit history with review filters
+Strict attendance rules (grace period, auto-close, absence cutoff)
 Print-friendly attendance reports
 Reset attendance logs (with confirmation)
 Delete individual log entries
@@ -61,23 +63,25 @@ cd frontend
 npm install
 npm run dev
 
-:lock: Security (Session Token Flow)
-Write/admin endpoints require a Bearer session token.
-Create a session via `POST /auth/session` using:
-- `device_id` (client identifier)
-- `device_secret` (server-side secret from `VECBOOK_DEVICE_SECRET`)
+:lock: Security (Admin Account + Token Flow)
+Write/admin endpoints require a Bearer token from an admin login.
+Log in via `POST /auth/login` using:
+- `username`
+- `password`
+
+On startup, the backend auto-creates the configured admin account if it does not already exist in the database.
 
 Recommended backend env vars:
-- `VECBOOK_DEVICE_SECRET` (required in real deployments)
-- `VECBOOK_SIGNING_KEY` (token signing key; defaults to device secret)
+- `VECBOOK_ADMIN_USERNAME` (default: `admin`)
+- `VECBOOK_ADMIN_PASSWORD` (default: `admin123`, change this in real deployments)
+- `VECBOOK_SIGNING_KEY` (token signing key)
 - `VECBOOK_AUTH_TOKEN_TTL_SECONDS` (default: 43200 / 12h)
 
 Frontend note:
-- No API secret is embedded in the client.
-- Use the Session Login screen (`/login`) to authenticate and store the bearer token locally.
+- Use the Admin Login screen (`/login`) to authenticate and store the bearer token locally.
 
 :shield: Debug + CORS Hardening
-- `/debug/dbpath` is protected by session auth and disabled by default.
+- `/debug/dbpath` is protected by admin auth and disabled by default.
 - Enable it only when needed: `VECBOOK_ENABLE_DEBUG_ENDPOINTS=true`
 - CORS is environment-driven:
   - `VECBOOK_CORS_ALLOW_ORIGINS` (comma-separated origins)
@@ -88,8 +92,12 @@ Frontend note:
 :wrench: Recognition Tuning (Optional)
 - `VECBOOK_MATCH_THRESHOLD` (default: 60)
 - `VECBOOK_STRICT_MATCH_THRESHOLD` (default: 85% of match threshold)
-- `VECBOOK_MATCH_CONFIRMATIONS` (default: 2 consecutive matches)
+- `VECBOOK_MATCH_CONFIRMATIONS` (default: 1 match)
 - `VECBOOK_SESSION_TTL_SECONDS` (default: 10)
+- `VECBOOK_ATTENDANCE_GRACE_MINUTES` (default: 10)
+- `VECBOOK_ATTENDANCE_AUTO_CLOSE_CUTOFF` (default: 17:30:00)
+- `VECBOOK_ATTENDANCE_ABSENCE_CUTOFF` (default: 23:59:00)
+- `VECBOOK_ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS` (default: 60)
 - `VECBOOK_MAX_FACES` (default: 1)
 - `VECBOOK_MIN_FACE_SIZE` (default: 120 px)
 - `VECBOOK_FACE_CENTER_MAX_OFFSET_RATIO` (default: 0.2 of min frame dimension)

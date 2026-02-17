@@ -3,6 +3,24 @@ import { Link, useParams } from "react-router-dom";
 import { fetchTeacherDTR } from "./api";
 import { useTheme } from "./ThemeProvider";
 
+function formatTo12Hour(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/[AP]M/i.test(raw)) return raw;
+
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return raw;
+
+  let hh = Number(m[1]);
+  const mm = m[2];
+  const ss = m[3] || "00";
+  const suffix = hh >= 12 ? "PM" : "AM";
+  hh %= 12;
+  if (hh === 0) hh = 12;
+  return `${String(hh).padStart(2, "0")}:${mm}:${ss} ${suffix}`;
+}
+
 function monthNow() {
   const d = new Date();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -225,10 +243,18 @@ export default function TeacherDTR() {
                       <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}`, fontWeight: 900 }}>
                         {day}
                       </td>
-                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r?.am_in || ""}</td>
-                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r?.am_out || ""}</td>
-                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r?.pm_in || ""}</td>
-                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r?.pm_out || ""}</td>
+                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                        {formatTo12Hour(r?.am_in)}
+                      </td>
+                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                        {formatTo12Hour(r?.am_out)}
+                      </td>
+                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                        {formatTo12Hour(r?.pm_in)}
+                      </td>
+                      <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                        {formatTo12Hour(r?.pm_out)}
+                      </td>
                     </tr>
                   );
                 })}

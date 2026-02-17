@@ -25,10 +25,10 @@ def client(tmp_path, monkeypatch):
 @pytest.fixture()
 def auth_headers(client):
     res = client.post(
-        "/auth/session",
+        "/auth/login",
         json={
-            "device_id": "pytest-client",
-            "device_secret": config.DEVICE_SECRET,
+            "username": config.ADMIN_USERNAME,
+            "password": config.ADMIN_PASSWORD,
         },
     )
     assert res.status_code == 200
@@ -59,13 +59,13 @@ def test_debug_dbpath_requires_session_when_enabled(client, monkeypatch, auth_he
     assert "db_path" in res.json()
 
 
-def test_session_rejects_invalid_secret(client):
+def test_login_rejects_invalid_credentials(client):
     res = client.post(
-        "/auth/session",
-        json={"device_id": "pytest-client", "device_secret": "wrong-secret"},
+        "/auth/login",
+        json={"username": config.ADMIN_USERNAME, "password": "wrong-password"},
     )
     assert res.status_code == 401
-    assert res.json()["detail"] == "Invalid device secret."
+    assert res.json()["detail"] == "Invalid admin credentials."
 
 
 def test_create_and_list_teachers(client, auth_headers):
@@ -83,10 +83,27 @@ def test_create_and_list_teachers(client, auth_headers):
     assert data["department"] == payload["department"]
     assert data["employee_id"] == payload["employee_id"]
 
-    res = client.get("/teachers")
+    res = client.get("/teachers", headers=auth_headers)
     assert res.status_code == 200
     rows = res.json()
     assert any(r["id"] == data["id"] for r in rows)
+
+
+def test_enroll_without_faces_is_rejected(client, auth_headers):
+    payload = {
+        "full_name": "No Face Teacher",
+        "department": "English",
+        "employee_id": "EMP_TEST_NOFACE_001",
+    }
+
+    res = client.post("/enroll", data=payload, headers=auth_headers)
+    assert res.status_code == 400
+    assert "Please capture at least 8 face images before enrolling." in res.json()["detail"]
+
+    list_res = client.get("/teachers", headers=auth_headers)
+    assert list_res.status_code == 200
+    rows = list_res.json()
+    assert all(r["employee_id"] != payload["employee_id"] for r in rows)
 
 
 def test_teacher_dtr_empty_month(client, auth_headers):
@@ -100,12 +117,117 @@ def test_teacher_dtr_empty_month(client, auth_headers):
     teacher_id = res.json()["id"]
 
     month = "2026-02"
-    res = client.get(f"/teachers/{teacher_id}/dtr", params={"month": month})
+    res = client.get(f"/teachers/{teacher_id}/dtr", params={"month": month}, headers=auth_headers)
     assert res.status_code == 200
     body = res.json()
     assert body["teacher"]["id"] == teacher_id
     assert body["month"] == month
     assert body["rows"] == []
+
+
+def test_summary_includes_non_punch_records(client, auth_headers):
+    conn = db.connect_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO teachers (full_name, department, employee_id)
+        VALUES (?, ?, ?)
+        """,
+        ("Summary Teacher", "Science", "EMP_SUMMARY_001"),
+    )
+    teacher_id = cur.lastrowid
+
+    cur.execute(
+        """
+        INSERT INTO attendance_daily (teacher_id, date, status, remarks, scan_attempts, source)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            teacher_id,
+            "2026-02-10",
+            "Outside Hours",
+            "Scan is during lunch break.",
+            1,
+            "LiveFaceCapture",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    records_res = client.get("/attendance", params={"date": "2026-02-10"}, headers=auth_headers)
+    assert records_res.status_code == 200
+    records = records_res.json()
+    assert len(records) == 1
+    assert records[0]["status"] == "Lunch break"
+
+    summary_res = client.get("/attendance/summary", params={"date": "2026-02-10"}, headers=auth_headers)
+    assert summary_res.status_code == 200
+    summary = summary_res.json()
+    assert summary["total"] == 1
+    assert summary["on_time"] == 0
+    assert summary["late"] == 0
+
+
+def test_admin_scan_events_with_filters(client, auth_headers):
+    conn = db.connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO teachers (full_name, department, employee_id)
+        VALUES (?, ?, ?)
+        """,
+        ("Audit Teacher", "History", "EMP_AUDIT_001"),
+    )
+    teacher_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    db.process_attendance_scan_v2(
+        teacher_id=teacher_id,
+        full_name="Audit Teacher",
+        department="History",
+        confidence=20.0,
+        scan_verified=True,
+        reason=None,
+        event_date="2026-02-10",
+        event_time="08:10:00",
+    )
+
+    res = client.get("/admin/scan-events", headers=auth_headers)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] >= 1
+    assert any(int(r["teacher_id"]) == teacher_id for r in body["rows"] if r["teacher_id"] is not None)
+
+    filtered = client.get(
+        "/admin/scan-events",
+        params={"teacher_id": teacher_id, "requires_review": False},
+        headers=auth_headers,
+    )
+    assert filtered.status_code == 200
+    filtered_body = filtered.json()
+    assert all((r["teacher_id"] == teacher_id) for r in filtered_body["rows"])
+
+
+def test_read_endpoints_require_session(client, auth_headers):
+    res = client.get("/teachers")
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Missing bearer token."
+
+    res = client.get("/attendance")
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Missing bearer token."
+
+    res = client.get("/attendance/summary", params={"date": "2026-02-10"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Missing bearer token."
+
+    res = client.get("/teachers", headers=auth_headers)
+    assert res.status_code == 200
+
+    res = client.get("/attendance", headers=auth_headers)
+    assert res.status_code == 200
 
 
 def test_recognize_requires_session_token(client, auth_headers):

@@ -34,11 +34,11 @@ function withAuth(headers = {}) {
   return { ...headers, Authorization: `Bearer ${token}` };
 }
 
-export async function createSession({ device_id, device_secret }) {
-  const r = await fetch(`${BASE}/auth/session`, {
+export async function createSession({ username, password }) {
+  const r = await fetch(`${BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ device_id, device_secret }),
+    body: JSON.stringify({ username, password }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.detail || "Authentication failed");
@@ -56,20 +56,65 @@ export async function fetchSessionMe() {
 
 export async function fetchTeachers() {
   const r = await fetch(`${BASE}/teachers`, { headers: withAuth() });
-  return r.json();
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to fetch teachers");
+  if (!Array.isArray(data)) throw new Error("Invalid teachers response");
+  return data;
 }
 
 export async function fetchAttendance(date) {
   const url = date ? `${BASE}/attendance?date=${encodeURIComponent(date)}` : `${BASE}/attendance`;
   const r = await fetch(url, { headers: withAuth() });
-  return r.json();
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to fetch attendance");
+  if (!Array.isArray(data)) throw new Error("Invalid attendance response");
+  return data;
+}
+
+export async function fetchRecognitionConfig() {
+  const r = await fetch(`${BASE}/config/recognition`);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to fetch recognition config");
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Invalid recognition config response");
+  }
+  return data;
+}
+
+export async function fetchScanEvents(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.date) params.set("date", String(filters.date));
+  if (filters.teacher_id != null && String(filters.teacher_id).trim() !== "") {
+    params.set("teacher_id", String(filters.teacher_id).trim());
+  }
+  if (filters.decision_code) params.set("decision_code", String(filters.decision_code));
+  if (filters.requires_review != null && filters.requires_review !== "") {
+    params.set("requires_review", String(filters.requires_review));
+  }
+  if (filters.limit != null) params.set("limit", String(filters.limit));
+  if (filters.offset != null) params.set("offset", String(filters.offset));
+
+  const qs = params.toString();
+  const url = qs ? `${BASE}/admin/scan-events?${qs}` : `${BASE}/admin/scan-events`;
+  const r = await fetch(url, { headers: withAuth() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to fetch scan audit history");
+  if (!data || typeof data !== "object" || !Array.isArray(data.rows)) {
+    throw new Error("Invalid scan events response");
+  }
+  return data;
 }
 
 export async function fetchSummary(date) {
   const r = await fetch(`${BASE}/attendance/summary?date=${encodeURIComponent(date)}`, {
     headers: withAuth(),
   });
-  return r.json();
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to fetch summary");
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Invalid summary response");
+  }
+  return data;
 }
 
 export async function createTeacher(payload) {
@@ -119,7 +164,12 @@ export async function recognizeFrame(blob, sessionId = null) {
 
 export async function fetchTeacherById(id) {
   const r = await fetch(`${BASE}/teachers/${id}`, { headers: withAuth() });
-  return r.json();
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to fetch teacher");
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Invalid teacher response");
+  }
+  return data;
 }
 
 export async function enrollWithFaces({ full_name, department, employee_id, files }) {

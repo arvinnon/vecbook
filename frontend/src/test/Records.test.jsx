@@ -48,7 +48,7 @@ test("renders attendance rows from API", async () => {
   expect(fetchAttendance).toHaveBeenCalledWith(null);
   expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
   expect(screen.getByText("On-Time")).toBeInTheDocument();
-  expect(screen.getByText("17:05:00")).toBeInTheDocument();
+  expect(screen.getByText("05:05:00 PM")).toBeInTheDocument();
 });
 
 test("filters by date and shows summary", async () => {
@@ -71,4 +71,13 @@ test("filters by date and shows summary", async () => {
   expect(
     screen.getByText("Total: 1 | On-Time: 1 | Late: 0")
   ).toBeInTheDocument();
+});
+
+test("shows an error toast when attendance load fails", async () => {
+  fetchAttendance.mockRejectedValueOnce(new Error("Unauthorized"));
+
+  renderRecords();
+
+  expect(await screen.findByText("Unauthorized")).toBeInTheDocument();
+  expect(screen.getByText("No records found.")).toBeInTheDocument();
 });

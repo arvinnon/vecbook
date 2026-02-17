@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import Header, HTTPException
 
-from backend.config import AUTH_TOKEN_TTL_SECONDS, DEVICE_SECRET, SIGNING_KEY
+from backend.config import AUTH_TOKEN_TTL_SECONDS, SIGNING_KEY
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -28,19 +28,14 @@ def _sign(payload_b64: str) -> str:
     return _b64url_encode(digest)
 
 
-def verify_device_secret(device_secret: str) -> bool:
-    expected = DEVICE_SECRET.strip()
-    candidate = (device_secret or "").strip()
-    if not expected:
-        return False
-    return hmac.compare_digest(candidate, expected)
-
-
-def issue_session_token(device_id: str) -> tuple[str, dict[str, Any]]:
+def issue_session_token(subject: str, role: str = "admin") -> tuple[str, dict[str, Any]]:
+    clean_subject = (subject or "").strip()
+    clean_role = (role or "").strip() or "admin"
     now = int(time.time())
     exp = now + AUTH_TOKEN_TTL_SECONDS
     payload = {
-        "sub": device_id.strip(),
+        "sub": clean_subject,
+        "role": clean_role,
         "iat": now,
         "exp": exp,
     }
@@ -69,14 +64,18 @@ def decode_session_token(token: str) -> dict[str, Any] | None:
         return None
 
     sub = payload.get("sub")
+    role = payload.get("role", "admin")
     exp = payload.get("exp")
     if not isinstance(sub, str) or not sub.strip():
+        return None
+    if not isinstance(role, str) or not role.strip():
         return None
     if not isinstance(exp, int):
         return None
     if exp < int(time.time()):
         return None
 
+    payload["role"] = role
     return payload
 
 

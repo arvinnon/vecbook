@@ -6,8 +6,8 @@ import { useTheme } from "./ThemeProvider";
 export default function SessionLogin() {
   const navigate = useNavigate();
   const { t, mode, toggle } = useTheme();
-  const [deviceId, setDeviceId] = useState("frontend-console");
-  const [deviceSecret, setDeviceSecret] = useState("");
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", msg: "" });
 
@@ -15,20 +15,20 @@ export default function SessionLogin() {
     e.preventDefault();
     setStatus({ type: "", msg: "" });
 
-    if (!deviceId.trim() || !deviceSecret.trim()) {
-      setStatus({ type: "error", msg: "Device ID and Device Secret are required." });
+    if (!username.trim() || !password.trim()) {
+      setStatus({ type: "error", msg: "Username and password are required." });
       return;
     }
 
     setLoading(true);
     try {
       const session = await createSession({
-        device_id: deviceId.trim(),
-        device_secret: deviceSecret.trim(),
+        username: username.trim(),
+        password: password.trim(),
       });
       setStatus({
         type: "success",
-        msg: `Authenticated. Session expires in ${session.expires_in}s.`,
+        msg: `Authenticated as ${session.username}. Session expires in ${session.expires_in}s.`,
       });
       setTimeout(() => navigate("/home", { replace: true }), 300);
     } catch (err) {
@@ -44,10 +44,10 @@ export default function SessionLogin() {
       const data = await fetchSessionMe();
       setStatus({
         type: "success",
-        msg: `Session valid for ${data.device_id}.`,
+        msg: `Session valid for vecbook ${data.username}.`,
       });
     } catch (err) {
-      setStatus({ type: "error", msg: err.message || "Session is not valid." });
+      setStatus({ type: "error", msg: err.message || "Login is not valid." });
     }
   }
 
@@ -64,7 +64,7 @@ export default function SessionLogin() {
           gap: 12,
         }}
       >
-        <h2 style={{ margin: 0 }}>Session Login</h2>
+        <h2 style={{ margin: 0 }}>VECBOOK</h2>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button
             onClick={toggle}
@@ -81,9 +81,7 @@ export default function SessionLogin() {
           >
             {mode === "light" ? "Dark" : "Light"}
           </button>
-          <Link to="/home" style={{ color: "white", fontWeight: 700, textDecoration: "none" }}>
-            Home
-          </Link>
+         
         </div>
       </header>
 
@@ -98,16 +96,16 @@ export default function SessionLogin() {
           }}
         >
           <div style={{ color: t.muted, fontWeight: 700, marginBottom: 14 }}>
-            Authenticate this client to call protected write/admin endpoints.
+            VECBOOK ADMIN
           </div>
 
           <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
             <label>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Device ID</div>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Username</div>
               <input
-                value={deviceId}
-                onChange={(e) => setDeviceId(e.target.value)}
-                placeholder="e.g., registrar-kiosk-1"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g., admin"
                 style={{
                   width: "100%",
                   padding: 12,
@@ -122,12 +120,12 @@ export default function SessionLogin() {
             </label>
 
             <label>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Device Secret</div>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Password</div>
               <input
                 type="password"
-                value={deviceSecret}
-                onChange={(e) => setDeviceSecret(e.target.value)}
-                placeholder="Enter VECBOOK_DEVICE_SECRET"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
                 style={{
                   width: "100%",
                   padding: 12,
@@ -154,48 +152,11 @@ export default function SessionLogin() {
                 cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "Signing in..." : "Create Session"}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
-          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={checkSession}
-              disabled={!hasSession()}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: `1px solid ${t.border}`,
-                background: t.card,
-                color: t.text,
-                fontWeight: 800,
-                cursor: hasSession() ? "pointer" : "not-allowed",
-              }}
-            >
-              Check Current Session
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                clearSession();
-                setStatus({ type: "success", msg: "Session cleared." });
-              }}
-              disabled={!hasSession()}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: `1px solid ${t.border}`,
-                background: t.card,
-                color: t.text,
-                fontWeight: 800,
-                cursor: hasSession() ? "pointer" : "not-allowed",
-              }}
-            >
-              Sign Out
-            </button>
-          </div>
+        
 
           {status.msg && (
             <div

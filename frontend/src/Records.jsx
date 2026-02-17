@@ -4,6 +4,29 @@ import { deleteAttendanceLog, fetchAttendance, fetchSummary, resetAttendance } f
 import ConfirmModal from "./ConfirmModal";
 import { useTheme } from "./ThemeProvider";
 
+function formatTo12Hour(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/[AP]M/i.test(raw)) return raw;
+
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return raw;
+
+  let hh = Number(m[1]);
+  const mm = m[2];
+  const ss = m[3] || "00";
+  const suffix = hh >= 12 ? "PM" : "AM";
+  hh %= 12;
+  if (hh === 0) hh = 12;
+  return `${String(hh).padStart(2, "0")}:${mm}:${ss} ${suffix}`;
+}
+
+function formatLastScan(row) {
+  if (!row || row.time_in || row.time_out) return "";
+  return formatTo12Hour(row.last_scan_time);
+}
+
 export default function Records() {
   const { t, mode, toggle } = useTheme();
 
@@ -18,11 +41,18 @@ export default function Records() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [toast, setToast] = useState({ type: "", msg: "" });
 
-  async function load() {
-    const data = await fetchAttendance(date || null);
-    setRows(data);
-    if (date) setSummary(await fetchSummary(date));
-    else setSummary(null);
+  async function load(selectedDate = date) {
+    const filterDate = typeof selectedDate === "string" ? selectedDate : date;
+    try {
+      const data = await fetchAttendance(filterDate || null);
+      setRows(data);
+      if (filterDate) setSummary(await fetchSummary(filterDate));
+      else setSummary(null);
+    } catch (e) {
+      setRows([]);
+      setSummary(null);
+      setToast({ type: "error", msg: e.message || "Failed to load attendance." });
+    }
   }
 
   useEffect(() => {
@@ -35,10 +65,10 @@ export default function Records() {
     setToast({ type: "", msg: "" });
     try {
       const res = await resetAttendance();
-      setToast({ type: "success", msg: res.message || "Attendance logs cleared." });
       setConfirmOpen(false);
       setDate("");
-      await load();
+      await load("");
+      setToast({ type: "success", msg: res.message || "Attendance logs cleared." });
     } catch (e) {
       setToast({ type: "error", msg: e.message });
     } finally {
@@ -234,7 +264,7 @@ export default function Records() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Name", "Department", "Date", "Time In", "Time Out", "Status", "Actions"].map((h) => (
+                  {["Name", "Department", "Date", "Time In", "Time Out", "Last Scan", "Status", "Actions"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -256,8 +286,15 @@ export default function Records() {
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.full_name}</td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.department}</td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.date}</td>
-                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.time_in}</td>
-                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.time_out || ""}</td>
+                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                      {formatTo12Hour(r.time_in)}
+                    </td>
+                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                      {formatTo12Hour(r.time_out)}
+                    </td>
+                    <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
+                      {formatLastScan(r)}
+                    </td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>{r.status}</td>
                     <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
                       <button
@@ -283,7 +320,7 @@ export default function Records() {
 
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan="7" style={{ padding: 14, color: t.muted }}>
+                    <td colSpan="8" style={{ padding: 14, color: t.muted }}>
                       No records found.
                     </td>
                   </tr>

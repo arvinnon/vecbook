@@ -10,6 +10,8 @@ FACES_DIR = Path(os.getenv("VECBOOK_FACES_DIR", ASSETS_DIR / "faces"))
 MODEL_PATH = Path(os.getenv("VECBOOK_MODEL_PATH", BASE_DIR / "face_recognition" / "face_model.yml"))
 DB_PATH = Path(os.getenv("VECBOOK_DB_PATH", BASE_DIR / "database" / "vecbook.db"))
 DEVICE_SECRET = os.getenv("VECBOOK_DEVICE_SECRET", "vecbook-device-secret-change-me").strip()
+ADMIN_USERNAME = os.getenv("VECBOOK_ADMIN_USERNAME", "admin").strip() or "admin"
+ADMIN_PASSWORD = os.getenv("VECBOOK_ADMIN_PASSWORD", "admin123").strip() or "admin123"
 SIGNING_KEY = (
     os.getenv("VECBOOK_SIGNING_KEY", "").strip()
     or DEVICE_SECRET
@@ -59,7 +61,7 @@ CORS_ALLOW_METHODS = _parse_csv(
 )
 CORS_ALLOW_HEADERS = _parse_csv(
     os.getenv("VECBOOK_CORS_ALLOW_HEADERS"),
-    ["Authorization", "Content-Type", "Accept"],
+    ["Authorization", "Content-Type", "Accept", "X-Session-Id"],
 )
 CORS_ALLOW_CREDENTIALS = _parse_bool(os.getenv("VECBOOK_CORS_ALLOW_CREDENTIALS"), True)
 ENABLE_DEBUG_ENDPOINTS = _parse_bool(os.getenv("VECBOOK_ENABLE_DEBUG_ENDPOINTS"), False)
@@ -69,12 +71,28 @@ AM_START = _parse_time(os.getenv("VECBOOK_AM_START"), time(7, 30))
 AM_END = _parse_time(os.getenv("VECBOOK_AM_END"), time(12, 0))
 PM_START = _parse_time(os.getenv("VECBOOK_PM_START"), time(13, 0))
 PM_END = _parse_time(os.getenv("VECBOOK_PM_END"), time(17, 0))
+ATTENDANCE_GRACE_MINUTES = max(
+    0,
+    int(os.getenv("VECBOOK_ATTENDANCE_GRACE_MINUTES", "10")),
+)
+ATTENDANCE_AUTO_CLOSE_CUTOFF = _parse_time(
+    os.getenv("VECBOOK_ATTENDANCE_AUTO_CLOSE_CUTOFF"),
+    time(17, 30),
+)
+ATTENDANCE_ABSENCE_CUTOFF = _parse_time(
+    os.getenv("VECBOOK_ATTENDANCE_ABSENCE_CUTOFF"),
+    time(23, 59),
+)
+ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS = max(
+    0,
+    int(os.getenv("VECBOOK_ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS", "60")),
+)
 
 MATCH_THRESHOLD = float(os.getenv("VECBOOK_MATCH_THRESHOLD", "60"))
 MATCH_STRICT_THRESHOLD = float(
     os.getenv("VECBOOK_STRICT_MATCH_THRESHOLD", f"{MATCH_THRESHOLD * 0.85:.2f}")
 )
-MATCH_CONFIRMATIONS = int(os.getenv("VECBOOK_MATCH_CONFIRMATIONS", "2"))
+MATCH_CONFIRMATIONS = int(os.getenv("VECBOOK_MATCH_CONFIRMATIONS", "1"))
 SESSION_TTL_SECONDS = int(os.getenv("VECBOOK_SESSION_TTL_SECONDS", "10"))
 
 # Recognition gates (reduce false positives)

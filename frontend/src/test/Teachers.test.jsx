@@ -68,3 +68,12 @@ test("filters by search input", async () => {
   expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
   expect(screen.queryByText("Grace Hopper")).toBeNull();
 });
+
+test("shows an error toast when teacher load fails", async () => {
+  fetchTeachers.mockRejectedValueOnce(new Error("Unauthorized"));
+
+  renderTeachers();
+
+  expect(await screen.findByText("Unauthorized")).toBeInTheDocument();
+  expect(screen.getByText("No teachers found.")).toBeInTheDocument();
+});

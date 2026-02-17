@@ -13,7 +13,11 @@ def train_status():
 
 @router.post("/train/run")
 def train_run(background_tasks: BackgroundTasks, _session: dict = Depends(require_session)):
-    started = schedule_training(background_tasks)
-    return {"ok": started, "message": "Training started" if started else "Training already running"}
+    state = schedule_training(background_tasks)
+    if state == "started":
+        return {"ok": True, "queued": False, "message": "Training started"}
+    if state == "queued":
+        return {"ok": True, "queued": True, "message": "Training in progress; next pass queued"}
+    return {"ok": False, "queued": True, "message": "Training already running"}
 
 

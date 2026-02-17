@@ -150,10 +150,9 @@ export default function Enroll() {
         employee_id: employeeId,
         files,
       });
-
       setStatus({
         type: "success",
-        msg: `Enrolled: ${res.full_name} (ID ${res.id}). Saved ${res.saved} image(s). Auto-training started.`,
+        msg: `Enrolled: ${res.full_name} (ID ${res.id}). Saved ${res.saved} image(s). ${res.training_message || "Training started."}`,
       });
 
       setFullName("");

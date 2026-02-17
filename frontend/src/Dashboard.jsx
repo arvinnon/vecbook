@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import logo from "./assets/vecbook-logo.svg";
 import { useTheme } from "./ThemeProvider";
+import { clearSession } from "./api";
 
 function CardLink({ to, icon, title, desc, t }) {
   return (
@@ -70,6 +71,12 @@ function CardDisabled({ icon, title, desc, t }) {
 
 export default function Dashboard() {
   const { t, mode, toggle } = useTheme();
+  const navigate = useNavigate();
+
+  function handleSignOut() {
+    clearSession();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <div style={{ background: t.bg, minHeight: "100vh", color: t.text }}>
@@ -125,20 +132,20 @@ export default function Dashboard() {
           >
             {mode === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light"}
           </button>
-          <Link
-            to="/login"
+          <button
+            onClick={handleSignOut}
             style={{
               color: "white",
               fontWeight: 800,
-              textDecoration: "none",
+              cursor: "pointer",
               padding: "8px 10px",
               borderRadius: 10,
               border: "1px solid rgba(255,255,255,0.25)",
               background: "rgba(255,255,255,0.12)",
             }}
           >
-            Session
-          </Link>
+            Sign Out
+          </button>
         </div>
       </header>
 
@@ -170,6 +177,13 @@ export default function Dashboard() {
             icon={"\u{1F4CB}"}
             title="Attendance Records"
             desc="Logs & daily summary"
+            t={t}
+          />
+          <CardLink
+            to="/audit"
+            icon={"\u{1F50E}"}
+            title="Scan Audit Logs"
+            desc="Review scan events"
             t={t}
           />
         </div>

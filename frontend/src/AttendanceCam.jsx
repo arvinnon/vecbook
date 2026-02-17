@@ -1,6 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { recognizeFrame, fetchTeacherById } from "./api";
+import { fetchRecognitionConfig, recognizeFrame } from "./api";
+
+const RECOGNITION_INTERVAL_MS = 30_000;
+const RECOGNITION_INTERVAL_SECONDS = RECOGNITION_INTERVAL_MS / 1000;
+const DEFAULT_WORKING_HOURS = {
+  am_start: "07:30:00",
+  am_end: "12:00:00",
+  pm_start: "13:00:00",
+  pm_end: "17:00:00",
+};
+
+function createSessionId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `cam-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function formatTimeNow() {
   return new Date().toLocaleTimeString([], {
@@ -9,6 +25,48 @@ function formatTimeNow() {
     second: "2-digit",
   });
 }
+
+function formatTo12Hour(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (/[AP]M/i.test(raw)) return raw;
+
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return raw;
+
+  let hh = Number(m[1]);
+  const mm = m[2];
+  const ss = m[3] || "00";
+  const suffix = hh >= 12 ? "PM" : "AM";
+  hh %= 12;
+  if (hh === 0) hh = 12;
+  return `${String(hh).padStart(2, "0")}:${mm}:${ss} ${suffix}`;
+}
+
+function parseHmsToSeconds(value) {
+  if (!value) return null;
+  const m = String(value).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  const ss = Number(m[3] || "0");
+  if (
+    Number.isNaN(hh) ||
+    Number.isNaN(mm) ||
+    Number.isNaN(ss) ||
+    hh < 0 ||
+    hh > 23 ||
+    mm < 0 ||
+    mm > 59 ||
+    ss < 0 ||
+    ss > 59
+  ) {
+    return null;
+  }
+  return hh * 3600 + mm * 60 + ss;
+}
+
 function confidenceLabel(conf, threshold = 70) {
   if (conf == null) return "";
   if (conf <= threshold * 0.55) return "Strong match";
@@ -21,18 +79,51 @@ export default function AttendanceCam() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const timerRef = useRef(null);
+  const countdownRef = useRef(null);
+  const nextScanAtRef = useRef(null);
   const noMatchCountRef = useRef(0);
-  const sessionRef = useRef(
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  );
+  const sessionIdRef = useRef(createSessionId());
 
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("Camera off");
   const [verifying, setVerifying] = useState(false);
+  const [secondsToNextScan, setSecondsToNextScan] = useState(null);
+  const [workingHours, setWorkingHours] = useState(DEFAULT_WORKING_HOURS);
+  const [clockTick, setClockTick] = useState(() => Date.now());
 
   const [success, setSuccess] = useState(null);
+
+  const amStartSeconds = parseHmsToSeconds(workingHours.am_start) ?? parseHmsToSeconds(DEFAULT_WORKING_HOURS.am_start);
+  const amEndSeconds = parseHmsToSeconds(workingHours.am_end) ?? parseHmsToSeconds(DEFAULT_WORKING_HOURS.am_end);
+  const pmStartSeconds = parseHmsToSeconds(workingHours.pm_start) ?? parseHmsToSeconds(DEFAULT_WORKING_HOURS.pm_start);
+  const pmEndSeconds = parseHmsToSeconds(workingHours.pm_end) ?? parseHmsToSeconds(DEFAULT_WORKING_HOURS.pm_end);
+  const now = new Date(clockTick);
+  const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const inAmWindow = amStartSeconds != null && amEndSeconds != null && nowSeconds >= amStartSeconds && nowSeconds < amEndSeconds;
+  const inPmWindow = pmStartSeconds != null && pmEndSeconds != null && nowSeconds >= pmStartSeconds && nowSeconds < pmEndSeconds;
+  const outsideWorkingHours = !inAmWindow && !inPmWindow;
+  const workingHoursLabel = `${formatTo12Hour(workingHours.am_start)}-${formatTo12Hour(workingHours.am_end)} and ${formatTo12Hour(workingHours.pm_start)}-${formatTo12Hour(workingHours.pm_end)}`;
+
+  function startCountdown() {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      const nextScanAt = nextScanAtRef.current;
+      if (!nextScanAt) {
+        setSecondsToNextScan(null);
+        return;
+      }
+      const remainingMs = nextScanAt - Date.now();
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      setSecondsToNextScan(Math.max(1, remainingSeconds));
+    }, 250);
+  }
+
+  function stopCountdown() {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = null;
+    nextScanAtRef.current = null;
+    setSecondsToNextScan(null);
+  }
 
   async function startCamera() {
     setStatus("Starting camera...");
@@ -66,28 +157,35 @@ export default function AttendanceCam() {
     if (timerRef.current) return;
 
     setRunning(true);
-    setStatus("Scanning...");
+    setStatus("Scanning every 30 seconds...");
+    nextScanAtRef.current = Date.now() + RECOGNITION_INTERVAL_MS;
+    setSecondsToNextScan(RECOGNITION_INTERVAL_SECONDS);
+    startCountdown();
     noMatchCountRef.current = 0;
-    timerRef.current = setInterval(sendFrameOnce, 1000); 
+    sendFrameOnce();
+    timerRef.current = setInterval(sendFrameOnce, RECOGNITION_INTERVAL_MS);
   }
 
   function stopRecognitionLoop() {
     setRunning(false);
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
+    stopCountdown();
     if (!success) setStatus("Recognition stopped");
   }
 
   const closeModalAndResume = () => {
+    stopRecognitionLoop();
     setSuccess(null);
-    setStatus("Scanning...");
+    setStatus("Ready. Click Start Recognition.");
     setVerifying(false);
     noMatchCountRef.current = 0;
-    setTimeout(() => startRecognitionLoop(), 250);
   };
 
   async function sendFrameOnce() {
     if (verifying || success) return;
+    nextScanAtRef.current = Date.now() + RECOGNITION_INTERVAL_MS;
+    setSecondsToNextScan(RECOGNITION_INTERVAL_SECONDS);
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -115,7 +213,7 @@ export default function AttendanceCam() {
       setVerifying(true);
       setStatus("Verifying identity...");
 
-      const res = await recognizeFrame(blob, sessionRef.current);
+      const res = await recognizeFrame(blob, sessionIdRef.current);
 
       if (res?.reason === "unknown_face") {
         noMatchCountRef.current = 0;
@@ -136,14 +234,15 @@ export default function AttendanceCam() {
           setStatus(`Hold still... (${n}/${need})`);
           return;
         }
-        if (res?.reason === "lunch_break") {
+        if (res?.reason === "model_missing") {
           noMatchCountRef.current = 0;
-          setStatus("Lunch break (12:00-13:00)");
-          return;
-        }
-        if (res?.reason === "out_of_shift") {
-          noMatchCountRef.current = 0;
-          setStatus("Outside shift hours");
+          setSuccess({
+            type: "no_match",
+            title: "Model not ready",
+            message: "Face model is missing. Please wait for training to finish, then try again.",
+          });
+          stopRecognitionLoop();
+          setStatus("Model missing. Run training first.");
           return;
         }
         if (res?.reason === "low_confidence") {
@@ -172,19 +271,24 @@ export default function AttendanceCam() {
           setStatus("No match");
           return;
         }
-        setStatus(`No match. Retrying (${noMatchCountRef.current}/3)`);
+        const reasonSuffix = res?.reason ? ` (${res.reason})` : "";
+        setStatus(`No match${reasonSuffix}. Retrying (${noMatchCountRef.current}/3)`);
         return;
       }
       noMatchCountRef.current = 0;
-      const t = await fetchTeacherById(res.teacher_id);
-      const fullName = t?.found ? t.full_name : `Teacher ID ${res.teacher_id}`;
-      const department = t?.found ? t.department : "-";
+      const fullName = res?.full_name || `Teacher ID ${res.teacher_id}`;
+      const department = res?.department || "-";
 
-      const timeIn = res.time_in || formatTimeNow();
+      const isLoggedPunch = res.logged === true;
+      const eventTimeRaw = isLoggedPunch
+        ? res.time_in || formatTimeNow()
+        : res.time || formatTimeNow();
+      const eventTime = formatTo12Hour(eventTimeRaw);
+      const eventTimeLabel = isLoggedPunch ? "Time In" : "Scan Time";
       const alreadyLogged =
         res.reason === "day_complete" || res.reason === "already_logged";
       const statusText =
-        res.logged === true
+        isLoggedPunch
           ? res.status || "Logged"
           : alreadyLogged
           ? "Already Logged Today"
@@ -198,7 +302,8 @@ export default function AttendanceCam() {
         type: "success",
         full_name: fullName,
         department,
-        time_in: timeIn,
+        event_time: eventTime,
+        event_time_label: eventTimeLabel,
         status: statusText,
         confidence: res.confidence,
       });
@@ -227,6 +332,31 @@ export default function AttendanceCam() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    fetchRecognitionConfig()
+      .then((cfg) => {
+        if (!mounted || !cfg) return;
+        setWorkingHours({
+          am_start: cfg.am_start || DEFAULT_WORKING_HOURS.am_start,
+          am_end: cfg.am_end || DEFAULT_WORKING_HOURS.am_end,
+          pm_start: cfg.pm_start || DEFAULT_WORKING_HOURS.pm_start,
+          pm_end: cfg.pm_end || DEFAULT_WORKING_HOURS.pm_end,
+        });
+      })
+      .catch(() => {
+        // keep defaults when config is unavailable
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div style={{ background: "#F5F7FA", minHeight: "100vh" }}>
       <header className="header">
@@ -245,6 +375,29 @@ export default function AttendanceCam() {
         <div className="card" style={{ padding: 16 }}>
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ fontWeight: 800 }}>Live Camera</div>
+
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 12,
+                border: outsideWorkingHours ? "1px solid #FCA5A5" : "1px solid #BFDBFE",
+                background: outsideWorkingHours ? "#FEF2F2" : "#EFF6FF",
+                color: outsideWorkingHours ? "#991B1B" : "#1E40AF",
+                fontWeight: 700,
+              }}
+            >
+              <div style={{ fontWeight: 900 }}>
+                {outsideWorkingHours ? "Outside working hours" : "Within working hours"}
+              </div>
+              <div style={{ marginTop: 4 }}>
+                Schedule: {workingHoursLabel}
+              </div>
+              {outsideWorkingHours && (
+                <div style={{ marginTop: 4 }}>
+                  Scans beyond working hours are not logged as DTR time-in.
+                </div>
+              )}
+            </div>
 
             <div
               style={{
@@ -338,6 +491,9 @@ export default function AttendanceCam() {
               style={{ padding: 12, borderRadius: 12, background: "#EEF2FF" }}
             >
               <b>Status:</b> {status}
+              {running && !verifying && typeof secondsToNextScan === "number"
+                ? ` (next scan in ${secondsToNextScan}s)`
+                : ""}
             </div>
           </div>
 
@@ -554,8 +710,10 @@ export default function AttendanceCam() {
               }}
             >
               <span>{"\u{1F552}"}</span>
-              <span style={{ fontWeight: 800 }}>Time In:</span>
-              <span>{success.time_in}</span>
+              <span style={{ fontWeight: 800 }}>
+                {success.event_time_label || "Time In"}:
+              </span>
+              <span>{success.event_time}</span>
             </div>
 
             {typeof success.confidence === "number" && (

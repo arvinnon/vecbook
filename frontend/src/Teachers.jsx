@@ -4,6 +4,30 @@ import { fetchTeachers, hardReset } from "./api";
 import ConfirmModal from "./ConfirmModal";
 import { useTheme } from "./ThemeProvider";
 
+function formatEnrolledAt(value) {
+  if (!value) return "-";
+  const raw = String(value).trim();
+
+  // SQLite CURRENT_TIMESTAMP is UTC ("YYYY-MM-DD HH:MM:SS"); treat it as UTC then display local time.
+  if (!raw.includes(":")) return raw;
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const withZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(normalized)
+    ? normalized
+    : `${normalized}Z`;
+
+  const parsed = new Date(withZone);
+  if (Number.isNaN(parsed.getTime())) return raw;
+
+  return parsed.toLocaleString([], {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export default function Teachers() {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
@@ -14,8 +38,19 @@ export default function Teachers() {
 
   const { t, mode, toggle } = useTheme();
 
+  async function loadTeachers() {
+    try {
+      const data = await fetchTeachers();
+      setRows(data);
+    } catch (e) {
+      setRows([]);
+      setToast({ type: "error", msg: e.message || "Failed to load teachers." });
+    }
+  }
+
   useEffect(() => {
-    fetchTeachers().then(setRows);
+    loadTeachers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
@@ -219,7 +254,7 @@ export default function Teachers() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["ID", "Name", "Department", "Employee ID", "Enrolled", "Actions"].map(
+                {["ID", "Name", "Department", "Employee ID", "Record"].map(
                   (h) => (
                     <th
                       key={h}
@@ -253,11 +288,6 @@ export default function Teachers() {
                   <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
                     {r.employee_id}
                   </td>
-                  <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
-                    {r.created_at}
-                  </td>
-
-                  {/* NEW: Actions */}
                   <td style={{ padding: 10, borderBottom: `1px solid ${rowBorder}` }}>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       <Link
