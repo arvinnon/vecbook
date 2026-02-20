@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from datetime import datetime
 
 import backend.config as config
 import backend.main as main
@@ -34,6 +35,22 @@ def auth_headers(client):
     assert res.status_code == 200
     token = res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+def _insert_teacher(*, full_name: str, department: str, employee_id: str) -> int:
+    conn = db.connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO teachers (full_name, department, employee_id)
+        VALUES (?, ?, ?)
+        """,
+        (full_name, department, employee_id),
+    )
+    teacher_id = int(cur.lastrowid)
+    conn.commit()
+    conn.close()
+    return teacher_id
 
 
 def test_health(client):
@@ -239,3 +256,87 @@ def test_recognize_requires_session_token(client, auth_headers):
 
     res = client.post("/attendance/recognize", files=files, headers=auth_headers)
     assert res.status_code == 400
+
+
+def test_recognition_config_reports_updated_attendance_defaults(client):
+    res = client.get("/config/recognition")
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["am_start"] == "05:00:00"
+    assert payload["pm_end"] == "19:00:00"
+    assert payload["attendance_auto_close_cutoff"] == "19:00:00"
+    assert payload["attendance_logout_mode"] == "fixed_two_action"
+
+
+def test_fixed_logout_mode_keeps_lunch_scan_outside_schedule(client, monkeypatch):
+    teacher_id = _insert_teacher(
+        full_name="Fixed Mode Teacher",
+        department="Science",
+        employee_id="EMP_FIXED_MODE_001",
+    )
+    monkeypatch.setattr(db, "ATTENDANCE_LOGOUT_MODE", "fixed_two_action")
+    event_date = datetime.now().strftime("%Y-%m-%d")
+
+    first = db.process_attendance_scan_v2(
+        teacher_id=teacher_id,
+        full_name="Fixed Mode Teacher",
+        department="Science",
+        confidence=18.0,
+        scan_verified=True,
+        reason=None,
+        event_date=event_date,
+        event_time="11:50:00",
+    )
+    assert first["decision_code"] == "TIME_IN_SET"
+    assert first["logged"] is True
+
+    lunch = db.process_attendance_scan_v2(
+        teacher_id=teacher_id,
+        full_name="Fixed Mode Teacher",
+        department="Science",
+        confidence=18.0,
+        scan_verified=True,
+        reason=None,
+        event_date=event_date,
+        event_time="12:10:00",
+    )
+    assert lunch["decision_code"] == "OUTSIDE_SCHEDULE_LUNCH"
+    assert lunch["logged"] is False
+    assert lunch["dtr_action"] == "none"
+
+
+def test_flexible_logout_mode_allows_lunch_scan_timeout(client, monkeypatch):
+    teacher_id = _insert_teacher(
+        full_name="Flexible Mode Teacher",
+        department="Math",
+        employee_id="EMP_FLEX_MODE_001",
+    )
+    monkeypatch.setattr(db, "ATTENDANCE_LOGOUT_MODE", "flexible")
+    event_date = datetime.now().strftime("%Y-%m-%d")
+
+    first = db.process_attendance_scan_v2(
+        teacher_id=teacher_id,
+        full_name="Flexible Mode Teacher",
+        department="Math",
+        confidence=18.0,
+        scan_verified=True,
+        reason=None,
+        event_date=event_date,
+        event_time="11:50:00",
+    )
+    assert first["decision_code"] == "TIME_IN_SET"
+    assert first["logged"] is True
+
+    lunch = db.process_attendance_scan_v2(
+        teacher_id=teacher_id,
+        full_name="Flexible Mode Teacher",
+        department="Math",
+        confidence=18.0,
+        scan_verified=True,
+        reason=None,
+        event_date=event_date,
+        event_time="12:10:00",
+    )
+    assert lunch["decision_code"] == "TIME_OUT_SET"
+    assert lunch["logged"] is True
+    assert lunch["dtr_action"] == "time_out"

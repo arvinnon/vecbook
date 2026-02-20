@@ -51,6 +51,13 @@ def _parse_time(value: str | None, fallback: time) -> time:
         return fallback
 
 
+def _parse_attendance_logout_mode(value: str | None) -> str:
+    normalized = (value or "").strip().lower().replace("-", "_")
+    if normalized == "flexible":
+        return "flexible"
+    return "fixed_two_action"
+
+
 CORS_ALLOW_ORIGINS = _parse_csv(
     os.getenv("VECBOOK_CORS_ALLOW_ORIGINS"),
     ["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -67,17 +74,17 @@ CORS_ALLOW_CREDENTIALS = _parse_bool(os.getenv("VECBOOK_CORS_ALLOW_CREDENTIALS")
 ENABLE_DEBUG_ENDPOINTS = _parse_bool(os.getenv("VECBOOK_ENABLE_DEBUG_ENDPOINTS"), False)
 
 
-AM_START = _parse_time(os.getenv("VECBOOK_AM_START"), time(7, 30))
+AM_START = _parse_time(os.getenv("VECBOOK_AM_START"), time(5, 0))
 AM_END = _parse_time(os.getenv("VECBOOK_AM_END"), time(12, 0))
 PM_START = _parse_time(os.getenv("VECBOOK_PM_START"), time(13, 0))
-PM_END = _parse_time(os.getenv("VECBOOK_PM_END"), time(17, 0))
+PM_END = _parse_time(os.getenv("VECBOOK_PM_END"), time(19, 0))
 ATTENDANCE_GRACE_MINUTES = max(
     0,
     int(os.getenv("VECBOOK_ATTENDANCE_GRACE_MINUTES", "10")),
 )
 ATTENDANCE_AUTO_CLOSE_CUTOFF = _parse_time(
     os.getenv("VECBOOK_ATTENDANCE_AUTO_CLOSE_CUTOFF"),
-    time(17, 30),
+    PM_END,
 )
 ATTENDANCE_ABSENCE_CUTOFF = _parse_time(
     os.getenv("VECBOOK_ATTENDANCE_ABSENCE_CUTOFF"),
@@ -86,6 +93,9 @@ ATTENDANCE_ABSENCE_CUTOFF = _parse_time(
 ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS = max(
     0,
     int(os.getenv("VECBOOK_ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS", "60")),
+)
+ATTENDANCE_LOGOUT_MODE = _parse_attendance_logout_mode(
+    os.getenv("VECBOOK_ATTENDANCE_LOGOUT_MODE"),
 )
 
 MATCH_THRESHOLD = float(os.getenv("VECBOOK_MATCH_THRESHOLD", "60"))

@@ -16,6 +16,7 @@ from backend.config import (
     ATTENDANCE_AUTO_CLOSE_CUTOFF,
     ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS,
     ATTENDANCE_GRACE_MINUTES,
+    ATTENDANCE_LOGOUT_MODE,
     DB_PATH,
     PM_END,
     PM_START,
@@ -970,6 +971,10 @@ def _in_pm_window(scan_time: time) -> bool:
     return PM_START <= scan_time < PM_END
 
 
+def _in_attendance_day_window(scan_time: time) -> bool:
+    return AM_START <= scan_time < PM_END
+
+
 def _is_lunch_break(scan_time: time) -> bool:
     return AM_END <= scan_time < PM_START
 
@@ -1727,6 +1732,7 @@ def process_attendance_scan_v2(
         absence_marked = bool(row[11]) if row else False
 
         in_working_hours = _in_am_window(scan_time) or _in_pm_window(scan_time)
+        flexible_logout_enabled = ATTENDANCE_LOGOUT_MODE == "flexible"
         if time_in and time_out:
             decision_code = "DAY_COMPLETE"
             decision_message = "Attendance already complete for this day."
@@ -1736,8 +1742,14 @@ def process_attendance_scan_v2(
 
         elif not in_working_hours:
             scheduled_end_time = _coerce_clock_time(scheduled_end_hms) or PM_END
+            can_flexible_timeout = bool(
+                flexible_logout_enabled
+                and time_in
+                and not time_out
+                and _in_attendance_day_window(scan_time)
+            )
             can_outside_timeout = bool(time_in and not time_out and scan_time >= scheduled_end_time)
-            if can_outside_timeout:
+            if can_flexible_timeout or can_outside_timeout:
                 elapsed_seconds = _seconds_between_same_day(event_date, time_in, event_time)
                 if (
                     ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS > 0
@@ -1751,8 +1763,6 @@ def process_attendance_scan_v2(
                     retry_after_seconds = ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS - elapsed_seconds
                 else:
                     decision_code = "TIME_OUT_SET"
-                    decision_message = "Time-out recorded outside shift hours."
-                    requires_admin_review = True
                     logged = True
                     dtr_action = "time_out"
                     time_out = event_time
@@ -1764,7 +1774,15 @@ def process_attendance_scan_v2(
                     )
                     if status not in {"Present", "Late"}:
                         status = "Present"
-                    remarks = decision_message
+
+                    if can_outside_timeout and not can_flexible_timeout:
+                        decision_message = "Time-out recorded outside shift hours."
+                        requires_admin_review = True
+                        remarks = decision_message
+                    else:
+                        decision_message = "Time-out recorded."
+                        remarks = None
+
                     cur.execute(
                         """
                         UPDATE attendance_daily

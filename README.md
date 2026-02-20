@@ -3,6 +3,10 @@ Facial Recognition Attendance System
 Vecbook is a full-stack facial recognition attendance system built with FastAPI, React, and OpenCV (LBPH).
 It allows administrators to register teachers, train facial data, and log attendance automatically using a webcam.
 
+## Documentation
+- User Guide: `docs/USER_GUIDE.md`
+- User Guide (Screenshots): `docs/USER_GUIDE_SCREENSHOTS.md`
+
 :rocket: Features
 :bust_in_silhouette: Teacher Management
 Register teachers with name, department, and employee ID
@@ -94,10 +98,15 @@ Frontend note:
 - `VECBOOK_STRICT_MATCH_THRESHOLD` (default: 85% of match threshold)
 - `VECBOOK_MATCH_CONFIRMATIONS` (default: 1 match)
 - `VECBOOK_SESSION_TTL_SECONDS` (default: 10)
+- `VECBOOK_AM_START` (default: 05:00:00)
+- `VECBOOK_AM_END` (default: 12:00:00)
+- `VECBOOK_PM_START` (default: 13:00:00)
+- `VECBOOK_PM_END` (default: 19:00:00)
 - `VECBOOK_ATTENDANCE_GRACE_MINUTES` (default: 10)
-- `VECBOOK_ATTENDANCE_AUTO_CLOSE_CUTOFF` (default: 17:30:00)
+- `VECBOOK_ATTENDANCE_AUTO_CLOSE_CUTOFF` (default: 19:00:00)
 - `VECBOOK_ATTENDANCE_ABSENCE_CUTOFF` (default: 23:59:00)
 - `VECBOOK_ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS` (default: 60)
+- `VECBOOK_ATTENDANCE_LOGOUT_MODE` (default: `fixed_two_action`, set to `flexible` for lunch-window/within-day logout flexibility)
 - `VECBOOK_MAX_FACES` (default: 1)
 - `VECBOOK_MIN_FACE_SIZE` (default: 120 px)
 - `VECBOOK_FACE_CENTER_MAX_OFFSET_RATIO` (default: 0.2 of min frame dimension)

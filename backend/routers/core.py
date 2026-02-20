@@ -5,6 +5,7 @@ from backend.config import (
     ATTENDANCE_AUTO_CLOSE_CUTOFF,
     ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS,
     ATTENDANCE_GRACE_MINUTES,
+    ATTENDANCE_LOGOUT_MODE,
     AM_END,
     AM_START,
     BLUR_THRESHOLD,
@@ -60,4 +61,5 @@ def recognition_config():
         "attendance_auto_close_cutoff": ATTENDANCE_AUTO_CLOSE_CUTOFF.strftime("%H:%M:%S"),
         "attendance_absence_cutoff": ATTENDANCE_ABSENCE_CUTOFF.strftime("%H:%M:%S"),
         "attendance_duplicate_cooldown_seconds": ATTENDANCE_DUPLICATE_COOLDOWN_SECONDS,
+        "attendance_logout_mode": ATTENDANCE_LOGOUT_MODE,
     }

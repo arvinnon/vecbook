@@ -223,7 +223,7 @@ export default function Enroll() {
           }}
         >
           <div style={{ marginBottom: 14 }}>
-            <TrainingStatus compact />
+            <TrainingStatus />
           </div>
 
           <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>

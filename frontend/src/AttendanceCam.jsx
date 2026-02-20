@@ -5,10 +5,10 @@ import { fetchRecognitionConfig, recognizeFrame } from "./api";
 const RECOGNITION_INTERVAL_MS = 30_000;
 const RECOGNITION_INTERVAL_SECONDS = RECOGNITION_INTERVAL_MS / 1000;
 const DEFAULT_WORKING_HOURS = {
-  am_start: "07:30:00",
+  am_start: "05:00:00",
   am_end: "12:00:00",
   pm_start: "13:00:00",
-  pm_end: "17:00:00",
+  pm_end: "19:00:00",
 };
 
 function createSessionId() {
