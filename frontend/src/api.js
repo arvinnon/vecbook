@@ -129,6 +129,16 @@ export async function createTeacher(payload) {
   return data;
 }
 
+export async function deleteTeacher(teacherId) {
+  const r = await fetch(`${BASE}/teachers/${teacherId}`, {
+    method: "DELETE",
+    headers: withAuth(),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Failed to delete teacher");
+  return data;
+}
+
 export async function uploadFaces(teacherId, files) {
   const form = new FormData();
   for (const f of files) form.append("files", f);

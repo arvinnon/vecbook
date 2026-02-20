@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { fetchTeachers, hardReset } from "./api";
+import { deleteTeacher, fetchTeachers, hardReset } from "./api";
 import ConfirmModal from "./ConfirmModal";
 import { useTheme } from "./ThemeProvider";
 
@@ -34,6 +34,9 @@ export default function Teachers() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast] = useState({ type: "", msg: "" });
 
   const { t, mode, toggle } = useTheme();
@@ -85,6 +88,30 @@ export default function Teachers() {
       setToast({ type: "error", msg: e.message || "Reset failed." });
     } finally {
       setResetLoading(false);
+    }
+  }
+
+  async function doDeleteTeacher() {
+    const target = deleteTarget;
+    if (!target) return;
+
+    setDeleteLoading(true);
+    setToast({ type: "", msg: "" });
+    try {
+      await deleteTeacher(target.id);
+
+      const refreshed = await fetchTeachers();
+      setRows(refreshed);
+      setDeleteConfirmOpen(false);
+      setDeleteTarget(null);
+      setToast({
+        type: "success",
+        msg: `${target.full_name} deleted.`,
+      });
+    } catch (e) {
+      setToast({ type: "error", msg: e.message || "Failed to delete teacher." });
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -305,6 +332,24 @@ export default function Teachers() {
                       >
                         {"\u{1F5D3} DTR"}
                       </Link>
+                      <button
+                        onClick={() => {
+                          setDeleteTarget(r);
+                          setDeleteConfirmOpen(true);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid #FCA5A5",
+                          background: "transparent",
+                          color: mode === "light" ? "#B91C1C" : "#FCA5A5",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                        }}
+                        title="Delete this teacher"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -312,7 +357,7 @@ export default function Teachers() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="6" style={{ padding: 14, color: t.muted }}>
+                  <td colSpan="5" style={{ padding: 14, color: t.muted }}>
                     No teachers found.
                   </td>
                 </tr>
@@ -333,6 +378,25 @@ export default function Teachers() {
         loading={resetLoading}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={doHardReset}
+      />
+
+      <ConfirmModal
+        open={deleteConfirmOpen}
+        title="Delete this teacher?"
+        message={
+          deleteTarget?.full_name
+            ? `This will permanently delete ${deleteTarget.full_name}, their uploaded face images, and linked attendance records.`
+            : "This will permanently delete this teacher, their uploaded face images, and linked attendance records."
+        }
+        confirmText="Yes, delete teacher"
+        cancelText="Cancel"
+        danger
+        loading={deleteLoading}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={doDeleteTeacher}
       />
     </div>
   );

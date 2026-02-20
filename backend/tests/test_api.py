@@ -106,6 +106,53 @@ def test_create_and_list_teachers(client, auth_headers):
     assert any(r["id"] == data["id"] for r in rows)
 
 
+def test_delete_teacher_removes_teacher_and_attendance_rows(client, auth_headers):
+    payload = {
+        "full_name": "Delete Me",
+        "department": "Science",
+        "employee_id": "EMP_DELETE_001",
+    }
+    create_res = client.post("/teachers", json=payload, headers=auth_headers)
+    assert create_res.status_code == 200
+    teacher_id = int(create_res.json()["id"])
+
+    conn = db.connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO attendance_daily (teacher_id, date, status, scan_attempts, source)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (teacher_id, "2026-02-10", "Present", 1, "LiveFaceCapture"),
+    )
+    conn.commit()
+    conn.close()
+
+    delete_res = client.delete(f"/teachers/{teacher_id}", headers=auth_headers)
+    assert delete_res.status_code == 200
+    delete_body = delete_res.json()
+    assert delete_body["ok"] is True
+    assert int(delete_body["id"]) == teacher_id
+
+    list_res = client.get("/teachers", headers=auth_headers)
+    assert list_res.status_code == 200
+    rows = list_res.json()
+    assert all(int(r["id"]) != teacher_id for r in rows)
+
+    conn = db.connect_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(1) FROM attendance_daily WHERE teacher_id = ?", (teacher_id,))
+    remaining_attendance = int(cur.fetchone()[0] or 0)
+    conn.close()
+    assert remaining_attendance == 0
+
+
+def test_delete_teacher_returns_404_for_missing_teacher(client, auth_headers):
+    res = client.delete("/teachers/999999", headers=auth_headers)
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Teacher not found."
+
+
 def test_enroll_without_faces_is_rejected(client, auth_headers):
     payload = {
         "full_name": "No Face Teacher",

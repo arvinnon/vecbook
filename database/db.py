@@ -204,6 +204,23 @@ def get_teacher_by_id(teacher_id: int):
     return row
 
 
+def delete_teacher(teacher_id: int) -> bool:
+    conn = connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        DELETE FROM teachers
+        WHERE id = ?
+        """,
+        (teacher_id,),
+    )
+    deleted = cur.rowcount > 0
+    if deleted:
+        conn.commit()
+    conn.close()
+    return deleted
+
+
 # -----------------------------
 # Admin users
 # -----------------------------

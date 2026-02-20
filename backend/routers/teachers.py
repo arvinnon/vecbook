@@ -9,6 +9,7 @@ from backend.security import require_session
 from backend.services.training import schedule_training
 from database.db import (
     add_teacher,
+    delete_teacher as delete_teacher_row,
     get_all_teachers,
     get_teacher_by_id,
     get_teacher_dtr_month,
@@ -71,6 +72,18 @@ def create_teacher(payload: TeacherCreate, _session: dict = Depends(require_sess
         }
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Employee ID already exists.")
+
+
+@router.delete("/teachers/{teacher_id}")
+def delete_teacher(teacher_id: int, _session: dict = Depends(require_session)):
+    if not delete_teacher_row(teacher_id):
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+
+    face_dir = FACES_DIR / str(teacher_id)
+    if face_dir.exists():
+        shutil.rmtree(face_dir, ignore_errors=True)
+
+    return {"ok": True, "id": teacher_id}
 
 
 # Save uploaded face images to assets/faces/<teacher_id>/

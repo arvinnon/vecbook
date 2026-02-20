@@ -1,12 +1,13 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import Teachers from "../Teachers";
 import { ThemeProvider } from "../ThemeProvider";
-import { fetchTeachers, hardReset } from "../api";
+import { deleteTeacher, fetchTeachers, hardReset } from "../api";
 
 vi.mock("../api", () => ({
+  deleteTeacher: vi.fn(),
   fetchTeachers: vi.fn(),
   hardReset: vi.fn(),
 }));
@@ -39,6 +40,7 @@ const rows = [
 ];
 
 beforeEach(() => {
+  deleteTeacher.mockReset();
   fetchTeachers.mockReset();
   hardReset.mockReset();
 });
@@ -76,4 +78,21 @@ test("shows an error toast when teacher load fails", async () => {
 
   expect(await screen.findByText("Unauthorized")).toBeInTheDocument();
   expect(screen.getByText("No teachers found.")).toBeInTheDocument();
+});
+
+test("deletes a teacher after confirmation", async () => {
+  fetchTeachers.mockResolvedValueOnce(rows).mockResolvedValueOnce(rows.slice(1));
+  deleteTeacher.mockResolvedValue({ ok: true, id: 1 });
+
+  renderTeachers();
+
+  await screen.findByText("Ada Lovelace");
+  fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+
+  expect(screen.getByText("Delete this teacher?")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Yes, delete teacher" }));
+
+  await waitFor(() => expect(deleteTeacher).toHaveBeenCalledWith(1));
+  await waitFor(() => expect(fetchTeachers).toHaveBeenCalledTimes(2));
+  expect(await screen.findByText("Ada Lovelace deleted.")).toBeInTheDocument();
 });
